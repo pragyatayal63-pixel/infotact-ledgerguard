@@ -60,3 +60,7 @@ This is our internship Project
 
 ## Dashboard State Sync
 - Added loading states and ledger summary metrics calculation helpers.
+
+
+## API & Middleware Setup
+- Configured Express JSON parsing, CORS headers, and structured error responses.
