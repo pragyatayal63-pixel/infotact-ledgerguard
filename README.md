@@ -44,3 +44,7 @@ This is our internship Project
 
 ## Ledger Transaction Model
 - Added schema fields for debit/credit entries, timestamps, and lock status.
+
+
+## API & Middleware Setup
+- Configured Express JSON parsing, CORS headers, and structured error responses.
