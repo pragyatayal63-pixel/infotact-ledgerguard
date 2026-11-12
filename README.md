@@ -16,3 +16,7 @@ This is our internship Project
 ## Frontend Error Handling
 - Standardized API timeout and retry fallback messages across dashboard views.
 - Toast alerts surface network and lock contention states cleanly.
+
+
+## API & Middleware Setup
+- Configured Express JSON parsing, CORS headers, and structured error responses.
