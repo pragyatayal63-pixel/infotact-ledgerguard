@@ -64,3 +64,7 @@ This is our internship Project
 
 ## API & Middleware Setup
 - Configured Express JSON parsing, CORS headers, and structured error responses.
+
+
+## Authentication Flow
+- Token verification and protected route guards added for dashboard access.
