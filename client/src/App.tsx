@@ -1,31 +1,24 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import Login from './pages/login'
+
+function Dashboard() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <h1 className="text-3xl font-bold">
+        Welcome to LedgerGuard Dashboard
+      </h1>
+    </div>
+  )
+}
 
 function App() {
-  
-
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Ledger Guard</h1>
-          <p>
-             Dynamic Multi-Tenant Zero-Knowledge Billing Engine
-          </p>
-        </div>
-        
-      </section>
-
-      
-    </>
+    <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   )
 }
 
