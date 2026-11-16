@@ -52,3 +52,7 @@ This is our internship Project
 
 ## Authentication Flow
 - Token verification and protected route guards added for dashboard access.
+
+
+## Ledger Transaction Model
+- Added schema fields for debit/credit entries, timestamps, and lock status.
