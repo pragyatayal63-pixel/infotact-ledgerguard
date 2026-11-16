@@ -1,17 +1,10 @@
-const express = require("express");
 
-const app = express();
-const PORT = 5000;
+require("dotenv").config();
 
-// Middleware to read JSON requests
-app.use(express.json());
+const app = require("./src/app");
 
-// Test route
-app.get("/", (req, res) => {
-    res.send("LedgerGuard Backend is Running!");
-});
+const PORT = process.env.PORT || 5000;
 
-// Start server
 app.listen(PORT, () => {
-    console.log(`LedgerGuard server running on port ${PORT}`);
+  console.log(`LedgerGuard server running on port ${PORT}`);
 });
