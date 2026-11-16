@@ -1,0 +1,54 @@
+:root {
+  --navy-950: #070f20;
+  --navy-900: #0b1730;
+  --navy-700: #1b2b4d;
+  --blue-600: #2563eb;
+  --blue-700: #1d4fd8;
+  --blue-100: #dbe7ff;
+  --ink-900: #0f172a;
+  --ink-600: #475569;
+  --ink-400: #94a3b8;
+  --line: #d5dbe6;
+  --surface: #ffffff;
+  --danger: #b42318;
+  --danger-bg: #fef3f2;
+  --success: #0f6b3f;
+  --success-bg: #ecf8f1;
+
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--navy-900);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
