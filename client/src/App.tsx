@@ -1,15 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/login'
-
-function Dashboard() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <h1 className="text-3xl font-bold">
-        Welcome to LedgerGuard Dashboard
-      </h1>
-    </div>
-  )
-}
+import Dashboard from './pages/dashboard' // Humne yahan aapka naya page import kar liya!
 
 function App() {
   return (
