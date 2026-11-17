@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios' // 👇 Axios yahan import kiya hai
 import { 
   Eye, EyeOff, ShieldCheck, Building, Mail, Key, 
   Zap, Lock, Shield, Fingerprint, Loader2, CheckCircle2 
@@ -13,7 +14,8 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'success' | 'sso-loading'>('idle')
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  // 👇 Yahan real API call lagayi hai
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!tenantId || !email || !password) {
       alert('Please fill all fields.')
@@ -21,15 +23,30 @@ export default function Login() {
     }
     
     setAuthStatus('loading')
-    // Simulate ZK-Proof Generation Delay
-    setTimeout(() => {
-      setAuthStatus('success')
-      setTimeout(() => {
-        // 👇 Yeh nayi line token save karegi
-        localStorage.setItem('ledgerToken', 'enterprise-secure-token-123')
-        navigate('/dashboard')
-      }, 1000)
-    }, 1500)
+    
+    try {
+      // Backend API par data bhej rahe hain
+      const response = await axios.post('http://localhost:5000/api/login', {
+        tenantId,
+        email,
+        password
+      })
+
+      // Agar login successful hua, toh backend se aane wale asli token ko save karenge
+      if (response.data.token) {
+        setAuthStatus('success')
+        localStorage.setItem('ledgerToken', response.data.token) 
+        
+        setTimeout(() => {
+          navigate('/dashboard')
+        }, 1000)
+      }
+    } catch (error) {
+      // Agar password galat hua ya backend offline hua
+      console.error("Login failed:", error)
+      alert("Invalid Credentials ya Backend offline hai!")
+      setAuthStatus('idle')
+    }
   }
 
   const handleSSO = () => {
@@ -37,7 +54,7 @@ export default function Login() {
     setTimeout(() => {
       setAuthStatus('success')
       setTimeout(() => {
-        // 👇 Yahan bhi token save hoga
+        // Yahan bhi token save hoga dummy SSO ke liye
         localStorage.setItem('ledgerToken', 'enterprise-secure-token-123')
         navigate('/dashboard')
       }, 1000)
