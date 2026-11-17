@@ -44,7 +44,14 @@ export default function Dashboard() {
         </div>
 
         <div className="px-4">
-          <button onClick={() => navigate('/login')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all">
+          <button 
+            onClick={() => {
+              // 👇 Token delete kiya aur login par bhej diya
+              localStorage.removeItem('ledgerToken')
+              navigate('/login')
+            }} 
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+          >
             <LogOut size={20} />
             <span className="font-medium">Logout</span>
           </button>

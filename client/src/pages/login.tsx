@@ -25,6 +25,8 @@ export default function Login() {
     setTimeout(() => {
       setAuthStatus('success')
       setTimeout(() => {
+        // 👇 Yeh nayi line token save karegi
+        localStorage.setItem('ledgerToken', 'enterprise-secure-token-123')
         navigate('/dashboard')
       }, 1000)
     }, 1500)
@@ -35,6 +37,8 @@ export default function Login() {
     setTimeout(() => {
       setAuthStatus('success')
       setTimeout(() => {
+        // 👇 Yahan bhi token save hoga
+        localStorage.setItem('ledgerToken', 'enterprise-secure-token-123')
         navigate('/dashboard')
       }, 1000)
     }, 1500)
