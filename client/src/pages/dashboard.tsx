@@ -1,12 +1,66 @@
+import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, ReceiptText, BarChart3, Settings, LogOut, 
   ShieldCheck, Search, Bell, User, Cpu, DollarSign, Hourglass, 
-  ChevronRight, Lock, Activity
+  ChevronRight, Lock, Activity, Loader2
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import axios from 'axios'
+
+interface DashboardData {
+  activeResources: number;
+  totalBilled: string;
+  pendingProofs: number;
+  transactions: Array<{
+    id: string;
+    hash: string;
+    client: string;
+    serviceType: string;
+    amount: string;
+    status: string;
+  }>;
+}
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState<DashboardData | null>(null)
+
+  // 🔄 Backend se real data fetch karne ka function
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('ledgerToken')
+        
+        // Backend API call with Authorization Header
+        const response = await axios.get('http://localhost:5000/api/dashboard-stats', {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        })
+
+        setData(response.data)
+        setLoading(false)
+      } catch (error) {
+        console.error("Failed to fetch dashboard stats, using fallback mock data:", error)
+        
+        // Fallback data agar backend offline ho ya API ready na ho
+        setData({
+          activeResources: 1428,
+          totalBilled: "$4.82M",
+          pendingProofs: 38,
+          transactions: [
+            { id: '1', hash: '0x8F9a...2B4c', client: 'Acme Global Financial', serviceType: 'SGX Prover Tier 3', amount: '$128,450.00', status: 'ZK-Verified' },
+            { id: '2', hash: '0x3E1b...79Fa', client: 'Apex Therapeutics', serviceType: 'ZK-STARK Batch', amount: '$42,800.00', status: 'Settled' },
+            { id: '3', hash: '0x992c...D120', client: 'Vanguard Systems', serviceType: 'Secure Enclave', amount: '$94,200.00', status: 'Pending' }
+          ]
+        })
+        setLoading(false)
+      }
+    }
+
+    fetchDashboardData()
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
@@ -46,7 +100,6 @@ export default function Dashboard() {
         <div className="px-4">
           <button 
             onClick={() => {
-              // 👇 Token delete kiya aur login par bhej diya
               localStorage.removeItem('ledgerToken')
               navigate('/login')
             }} 
@@ -113,105 +166,97 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-colors">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Active Resources</span>
-                <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><Cpu size={20} /></div>
-              </div>
-              <div>
-                <h3 className="text-4xl font-bold text-white mb-1">1,428</h3>
-                <p className="text-sm text-emerald-500 flex items-center gap-1">+12.4% vs last cycle</p>
-              </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 className="animate-spin text-blue-500" size={40} />
             </div>
+          ) : (
+            <>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-colors">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Active Resources</span>
+                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><Cpu size={20} /></div>
+                  </div>
+                  <div>
+                    <h3 className="text-4xl font-bold text-white mb-1">{data?.activeResources}</h3>
+                    <p className="text-sm text-emerald-500 flex items-center gap-1">+12.4% vs last cycle</p>
+                  </div>
+                </div>
 
-            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-colors">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Billed</span>
-                <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500"><DollarSign size={20} /></div>
-              </div>
-              <div>
-                <h3 className="text-4xl font-bold text-white mb-1">$4.82M</h3>
-                <p className="text-sm text-emerald-500 flex items-center gap-1">+8.2% QTD volume</p>
-              </div>
-            </div>
+                <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-colors">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Total Billed</span>
+                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500"><DollarSign size={20} /></div>
+                  </div>
+                  <div>
+                    <h3 className="text-4xl font-bold text-white mb-1">{data?.totalBilled}</h3>
+                    <p className="text-sm text-emerald-500 flex items-center gap-1">+8.2% QTD volume</p>
+                  </div>
+                </div>
 
-            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-colors">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Pending Proofs</span>
-                <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500"><Hourglass size={20} /></div>
+                <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-colors">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">Pending Proofs</span>
+                    <div className="p-2 bg-amber-500/10 rounded-lg text-amber-500"><Hourglass size={20} /></div>
+                  </div>
+                  <div>
+                    <h3 className="text-4xl font-bold text-white mb-1">{data?.pendingProofs}</h3>
+                    <p className="text-sm text-slate-400">cryptographic verifications</p>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 className="text-4xl font-bold text-white mb-1">38</h3>
-                <p className="text-sm text-slate-400">est. ~$240,890.00 volume</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Ledger Table */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-white">Recent Transactions</h2>
-              <button className="text-sm text-blue-500 hover:text-blue-400 font-medium flex items-center gap-1">
-                View Full Ledger <ChevronRight size={16} />
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-950/50 text-slate-400 text-xs uppercase tracking-wider">
-                    <th className="py-4 px-6 font-medium">Transaction Hash</th>
-                    <th className="py-4 px-6 font-medium">Client</th>
-                    <th className="py-4 px-6 font-medium">Service Type</th>
-                    <th className="py-4 px-6 font-medium text-right">Amount (USD)</th>
-                    <th className="py-4 px-6 font-medium text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 text-sm">
-                  <tr className="hover:bg-slate-800/50 transition-colors">
-                    <td className="py-4 px-6 font-mono text-blue-400 flex items-center gap-2">
-                      <Lock size={14} className="text-slate-500" /> 0x8F9a...2B4c
-                    </td>
-                    <td className="py-4 px-6 text-white font-medium">Acme Global Financial</td>
-                    <td className="py-4 px-6 text-slate-400">SGX Prover Tier 3</td>
-                    <td className="py-4 px-6 text-right font-medium text-white">$128,450.00</td>
-                    <td className="py-4 px-6 text-center">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> ZK-Verified
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/50 transition-colors">
-                    <td className="py-4 px-6 font-mono text-blue-400 flex items-center gap-2">
-                      <Lock size={14} className="text-slate-500" /> 0x3E1b...79Fa
-                    </td>
-                    <td className="py-4 px-6 text-white font-medium">Apex Therapeutics</td>
-                    <td className="py-4 px-6 text-slate-400">ZK-STARK Batch</td>
-                    <td className="py-4 px-6 text-right font-medium text-white">$42,800.00</td>
-                    <td className="py-4 px-6 text-center">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-500 text-xs font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Settled
-                      </span>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-slate-800/50 transition-colors">
-                    <td className="py-4 px-6 font-mono text-blue-400 flex items-center gap-2">
-                      <Lock size={14} className="text-slate-500" /> 0x992c...D120
-                    </td>
-                    <td className="py-4 px-6 text-white font-medium">Vanguard Systems</td>
-                    <td className="py-4 px-6 text-slate-400">Secure Enclave</td>
-                    <td className="py-4 px-6 text-right font-medium text-white">$94,200.00</td>
-                    <td className="py-4 px-6 text-center">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-500 text-xs font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Pending
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+              {/* Ledger Table */}
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                  <h2 className="text-lg font-bold text-white">Recent Transactions</h2>
+                  <button className="text-sm text-blue-500 hover:text-blue-400 font-medium flex items-center gap-1">
+                    View Full Ledger <ChevronRight size={16} />
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950/50 text-slate-400 text-xs uppercase tracking-wider">
+                        <th className="py-4 px-6 font-medium">Transaction Hash</th>
+                        <th className="py-4 px-6 font-medium">Client</th>
+                        <th className="py-4 px-6 font-medium">Service Type</th>
+                        <th className="py-4 px-6 font-medium text-right">Amount (USD)</th>
+                        <th className="py-4 px-6 font-medium text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800 text-sm">
+                      {data?.transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-slate-800/50 transition-colors">
+                          <td className="py-4 px-6 font-mono text-blue-400 flex items-center gap-2">
+                            <Lock size={14} className="text-slate-500" /> {tx.hash}
+                          </td>
+                          <td className="py-4 px-6 text-white font-medium">{tx.client}</td>
+                          <td className="py-4 px-6 text-slate-400">{tx.serviceType}</td>
+                          <td className="py-4 px-6 text-right font-medium text-white">{tx.amount}</td>
+                          <td className="py-4 px-6 text-center">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                              tx.status === 'ZK-Verified' ? 'bg-emerald-500/10 text-emerald-500' :
+                              tx.status === 'Settled' ? 'bg-blue-500/10 text-blue-500' :
+                              'bg-amber-500/10 text-amber-500'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                tx.status === 'ZK-Verified' ? 'bg-emerald-500' :
+                                tx.status === 'Settled' ? 'bg-blue-500' :
+                                'bg-amber-500 animate-pulse'
+                              }`}></span> {tx.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
           
         </main>
       </div>
