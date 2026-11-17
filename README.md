@@ -28,3 +28,7 @@ This is our internship Project
 
 ## Ledger Transaction Model
 - Added schema fields for debit/credit entries, timestamps, and lock status.
+
+
+## Dashboard State Sync
+- Added loading states and ledger summary metrics calculation helpers.
