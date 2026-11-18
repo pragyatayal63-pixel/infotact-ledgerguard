@@ -1,12 +1,13 @@
 
 const createTransaction = async (req, res, next) => {
-  const { eventId, accountId, type, amount, currency } = req.body;
-  const { Account, Transaction, LedgerEntry } = req.models;
-
   let session;
 
   try {
-    // 1. Validate required fields
+    // 1. Get request data and tenant-specific models
+    const { eventId, accountId, type, amount, currency } = req.body || {};
+    const { Account, Transaction, LedgerEntry } = req.models;
+
+    // 2. Validate required fields
     if (!eventId || !accountId || !type || amount === undefined) {
       return res.status(400).json({
         success: false,
@@ -14,7 +15,7 @@ const createTransaction = async (req, res, next) => {
       });
     }
 
-    // 2. Validate transaction type
+    // 3. Validate transaction type
     if (!["credit", "debit"].includes(type)) {
       return res.status(400).json({
         success: false,
@@ -22,7 +23,7 @@ const createTransaction = async (req, res, next) => {
       });
     }
 
-    // 3. Validate amount
+    // 4. Validate amount
     if (
       typeof amount !== "number" ||
       !Number.isFinite(amount) ||
@@ -34,13 +35,13 @@ const createTransaction = async (req, res, next) => {
       });
     }
 
-    // 4. Start MongoDB transaction session
+    // 5. Start MongoDB transaction session
     session = await req.db.startSession();
 
     let result;
 
     await session.withTransaction(async () => {
-      // 5. Prevent duplicate transactions
+      // 6. Prevent duplicate transactions
       const existing = await Transaction.findOne({ eventId }).session(session);
 
       if (existing) {
@@ -52,7 +53,7 @@ const createTransaction = async (req, res, next) => {
         throw err;
       }
 
-      // 6. Find account
+      // 7. Find account
       const account = await Account.findOne({ accountId }).session(session);
 
       if (!account) {
@@ -62,21 +63,7 @@ const createTransaction = async (req, res, next) => {
         throw err;
       }
 
-      // 7. Check sufficient balance for debit
-      if (type === "debit" && account.balance < amount) {
-        const err = new Error("Insufficient balance");
-        err.statusCode = 400;
-        err.code = "INSUFFICIENT_BALANCE";
-        throw err;
-      }
-
-      // 8. Calculate updated balance
-      const updatedBalance =
-        type === "credit"
-          ? account.balance + amount
-          : account.balance - amount;
-
-      // 9. Create transaction record
+      // 8. Create transaction record
       const [transaction] = await Transaction.create(
         [
           {
@@ -91,9 +78,30 @@ const createTransaction = async (req, res, next) => {
         { session }
       );
 
-      // 10. Update account balance
-      account.balance = updatedBalance;
-      await account.save({ session });
+      // 9. Atomically update account balance
+      const updatedAccount = await Account.findOneAndUpdate(
+        type === "debit"
+          ? { accountId, balance: { $gte: amount } }
+          : { accountId },
+        {
+          $inc: {
+            balance: type === "credit" ? amount : -amount,
+          },
+        },
+        {
+          new: true,
+          session,
+          runValidators: true,
+        }
+      );
+
+      // 10. Handle insufficient balance
+      if (!updatedAccount) {
+        const err = new Error("Insufficient balance");
+        err.statusCode = 400;
+        err.code = "INSUFFICIENT_BALANCE";
+        throw err;
+      }
 
       // 11. Create ledger entry
       await LedgerEntry.create(
@@ -104,33 +112,34 @@ const createTransaction = async (req, res, next) => {
             accountId,
             type,
             amount,
-            balanceAfter: updatedBalance,
+            balanceAfter: updatedAccount.balance,
           },
         ],
         { session }
       );
 
+      // 12. Store result
       result = {
         transaction,
-        balance: updatedBalance,
+        balance: updatedAccount.balance,
       };
     });
 
-    // 12. Send success response
+    // 13. Send success response
     return res.status(201).json({
       success: true,
       message: "Transaction completed successfully",
       data: result,
     });
   } catch (err) {
-    // 13. Handle duplicate key errors
+    // 14. Handle duplicate key errors
     if (err.code === 11000) {
       err.statusCode = 409;
       err.code = "DUPLICATE_TRANSACTION";
       err.message = "Duplicate transaction: eventId already exists";
     }
 
-    next(err);
+    return next(err);
   } finally {
     if (session) {
       await session.endSession();
