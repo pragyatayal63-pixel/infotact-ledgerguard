@@ -84,3 +84,7 @@ This is our internship Project
 
 ## Dashboard State Sync
 - Added loading states and ledger summary metrics calculation helpers.
+
+
+## Session & Auth Context
+- Added dynamic user session state and protected route fallback handling.
