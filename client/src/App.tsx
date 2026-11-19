@@ -2,10 +2,11 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/login'
 import Dashboard from './pages/dashboard'
+import { AuthProvider, useAuth } from './context/AuthContext'
 
 // 🛡️ Security Guard Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const token = localStorage.getItem('ledgerToken')
+  const { token } = useAuth()
   
   if (!token) {
     // Agar token nahi hai, toh wapas login par bhej do
@@ -18,22 +19,24 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/login" element={<Login />} />
-      
-      {/* Dashboard ko ab Security Guard (ProtectedRoute) ke andar pack kar diya */}
-      <Route 
-        path="/dashboard" 
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        
+        {/* Dashboard ko ab Security Guard (ProtectedRoute) ke andar pack kar diya */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </AuthProvider>
   )
 }
 
