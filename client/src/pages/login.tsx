@@ -5,9 +5,11 @@ import {
   Eye, EyeOff, ShieldCheck, Building, Mail, Key, 
   Zap, Lock, Shield, Fingerprint, Loader2, CheckCircle2 
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { loginSession } = useAuth()
   const [showPassword, setShowPassword] = useState(false)
   const [tenantId, setTenantId] = useState('')
   const [email, setEmail] = useState('')
@@ -32,10 +34,16 @@ export default function Login() {
         password
       })
 
-      // Agar login successful hua, toh backend se aane wale asli token ko save karenge
+      // Agar login successful hua, toh backend se aane wale asli token aur user data ko context mein save karenge
       if (response.data.token) {
         setAuthStatus('success')
-        localStorage.setItem('ledgerToken', response.data.token) 
+        const apiUser = response.data.user || {}
+        loginSession(response.data.token, {
+          name: apiUser.name || email.split('@')[0],
+          role: apiUser.role || 'Security Admin',
+          tenantName: apiUser.tenantName || tenantId,
+          email
+        })
         
         setTimeout(() => {
           navigate('/dashboard')
@@ -54,8 +62,12 @@ export default function Login() {
     setTimeout(() => {
       setAuthStatus('success')
       setTimeout(() => {
-        // Yahan bhi token save hoga dummy SSO ke liye
-        localStorage.setItem('ledgerToken', 'enterprise-secure-token-123')
+        loginSession('enterprise-secure-token-123', {
+          name: email ? email.split('@')[0] : 'Priyanka',
+          role: 'Security Admin',
+          tenantName: tenantId || 'Company A',
+          email
+        })
         navigate('/dashboard')
       }, 1000)
     }, 1500)

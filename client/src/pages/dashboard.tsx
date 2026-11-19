@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { useAuth } from '../context/AuthContext'
 
 interface DashboardData {
   activeResources: number;
@@ -23,19 +24,24 @@ interface DashboardData {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user, token, logoutSession } = useAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardData | null>(null)
+
+  const displayName = user?.name || 'Priyanka'
+  const displayRole = user?.role || 'Security Admin'
+  const displayTenant = user?.tenantName || 'Company A'
 
   // 🔄 Backend se real data fetch karne ka function
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem('ledgerToken')
+        const authToken = token || localStorage.getItem('ledgerToken')
         
         // Backend API call with Authorization Header
         const response = await axios.get('http://localhost:5000/api/dashboard-stats', {
           headers: {
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${authToken}`
           }
         })
 
@@ -60,7 +66,7 @@ export default function Dashboard() {
     }
 
     fetchDashboardData()
-  }, [])
+  }, [token])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
@@ -100,7 +106,7 @@ export default function Dashboard() {
         <div className="px-4">
           <button 
             onClick={() => {
-              localStorage.removeItem('ledgerToken')
+              logoutSession()
               navigate('/login')
             }} 
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
@@ -120,7 +126,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 px-4 py-1.5 bg-slate-900 rounded-full border border-slate-800">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span className="text-xs text-slate-400">Active Tenant:</span>
-              <span className="text-xs font-semibold text-white">Company A</span>
+              <span className="text-xs font-semibold text-white">{displayTenant}</span>
             </div>
           </div>
           
@@ -140,8 +146,8 @@ export default function Dashboard() {
             <div className="h-6 w-px bg-slate-800"></div>
             <div className="flex items-center gap-3">
               <div className="flex flex-col text-right hidden sm:flex">
-                <span className="text-sm font-medium text-white leading-none">Priyanka</span>
-                <span className="text-xs text-blue-500 uppercase tracking-wider mt-1">Security Admin</span>
+                <span className="text-sm font-medium text-white leading-none">{displayName}</span>
+                <span className="text-xs text-blue-500 uppercase tracking-wider mt-1">{displayRole}</span>
               </div>
               <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center border border-slate-700">
                 <User size={18} className="text-slate-300" />
@@ -155,7 +161,7 @@ export default function Dashboard() {
           
           <div className="mb-8 flex justify-between items-end">
             <div>
-              <h1 className="text-3xl font-bold text-white mb-2">Welcome back, Priyanka</h1>
+              <h1 className="text-3xl font-bold text-white mb-2">Welcome back, {displayName}</h1>
               <p className="text-slate-400 text-sm flex items-center gap-2">
                 <Activity size={14} className="text-emerald-500" />
                 Zero-knowledge cluster operational. All billing proofs synchronized.
