@@ -11,3 +11,8 @@ This is our internship Project
 ## Backend Ledger Validation
 - Payload schema checks ensure amount, currency, and account IDs are valid.
 - Idempotency keys prevent double-entry race conditions.
+
+
+## Frontend Error Handling
+- Standardized API timeout and retry fallback messages across dashboard views.
+- Toast alerts surface network and lock contention states cleanly.
