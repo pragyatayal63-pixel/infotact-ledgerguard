@@ -1,11 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios' // 👇 Axios yahan import kiya hai
 import { 
   Eye, EyeOff, ShieldCheck, Building, Mail, Key, 
-  Zap, Lock, Shield, Fingerprint, Loader2, CheckCircle2 
+  Zap, Lock, Shield, Fingerprint, Loader2, CheckCircle2, AlertCircle, X 
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+
+interface ToastState {
+  message: string;
+  type: 'success' | 'error';
+}
 
 export default function Login() {
   const navigate = useNavigate()
@@ -15,12 +20,19 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'success' | 'sso-loading'>('idle')
+  const [toast, setToast] = useState<ToastState | null>(null)
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 3500)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   // 👇 Yahan real API call lagayi hai
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!tenantId || !email || !password) {
-      alert('Please fill all fields.')
+      setToast({ message: 'Please fill all fields.', type: 'error' })
       return
     }
     
@@ -44,6 +56,7 @@ export default function Login() {
           tenantName: apiUser.tenantName || tenantId,
           email
         })
+        setToast({ message: 'Enclave attestation verified. Redirecting...', type: 'success' })
         
         setTimeout(() => {
           navigate('/dashboard')
@@ -52,7 +65,7 @@ export default function Login() {
     } catch (error) {
       // Agar password galat hua ya backend offline hua
       console.error("Login failed:", error)
-      alert("Invalid Credentials ya Backend offline hai!")
+      setToast({ message: 'Invalid Credentials ya Backend offline hai!', type: 'error' })
       setAuthStatus('idle')
     }
   }
@@ -61,6 +74,7 @@ export default function Login() {
     setAuthStatus('sso-loading')
     setTimeout(() => {
       setAuthStatus('success')
+      setToast({ message: 'SSO session verified. Entering dashboard...', type: 'success' })
       setTimeout(() => {
         loginSession('enterprise-secure-token-123', {
           name: email ? email.split('@')[0] : 'Priyanka',
@@ -75,6 +89,31 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex flex-col relative overflow-hidden">
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div
+          className={`fixed top-20 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-md text-sm font-medium ${
+            toast.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-300'
+              : 'bg-red-950/90 border-red-500/40 text-red-300'
+          }`}
+        >
+          {toast.type === 'success' ? (
+            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle size={18} className="text-red-400 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="text-slate-400 hover:text-white transition-colors ml-1"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Background Ambient Effects */}
       <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-blue-600/10 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-600/10 blur-[120px] pointer-events-none"></div>
