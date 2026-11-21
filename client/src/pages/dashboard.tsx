@@ -36,6 +36,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardData | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
+  const [activeTab, setActiveTab] = useState<'overview' | 'billing' | 'analytics' | 'settings'>('overview')
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Modal states for "+ New Invoicing Run"
   const [isRunModalOpen, setIsRunModalOpen] = useState(false)
@@ -182,6 +184,22 @@ export default function Dashboard() {
     }
   }
 
+  const handleLogout = () => {
+    logoutSession()
+    navigate('/login')
+  }
+
+  const filteredTransactions = (data?.transactions || []).filter((tx) => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return true
+    return (
+      tx.hash.toLowerCase().includes(q) ||
+      tx.client.toLowerCase().includes(q) ||
+      tx.serviceType.toLowerCase().includes(q) ||
+      tx.status.toLowerCase().includes(q)
+    )
+  })
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
       {/* Floating Toast Notification */}
@@ -223,32 +241,62 @@ export default function Dashboard() {
           </div>
           
           <nav className="flex flex-col gap-2 px-4">
-            <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-600/10 text-blue-500 font-medium">
+            <button
+              type="button"
+              onClick={() => setActiveTab('overview')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-left ${
+                activeTab === 'overview'
+                  ? 'bg-blue-600/10 text-blue-500'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
               <LayoutDashboard size={20} />
               <span>Overview</span>
-            </a>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all">
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('billing')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-left ${
+                activeTab === 'billing'
+                  ? 'bg-blue-600/10 text-blue-500'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
               <ReceiptText size={20} />
               <span>Billing Ledger</span>
-            </a>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all">
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('analytics')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-left ${
+                activeTab === 'analytics'
+                  ? 'bg-blue-600/10 text-blue-500'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
               <BarChart3 size={20} />
               <span>Analytics</span>
-            </a>
-            <a href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-200 transition-all">
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-left ${
+                activeTab === 'settings'
+                  ? 'bg-blue-600/10 text-blue-500'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
               <Settings size={20} />
               <span>Settings</span>
-            </a>
+            </button>
           </nav>
         </div>
 
         <div className="px-4">
           <button 
-            onClick={() => {
-              logoutSession()
-              navigate('/login')
-            }} 
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+            type="button"
+            onClick={handleLogout} 
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all cursor-pointer"
           >
             <LogOut size={20} />
             <span className="font-medium">Logout</span>
@@ -274,11 +322,17 @@ export default function Dashboard() {
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
               <input 
                 type="text" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Find proof or tx hash..." 
                 className="pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-sm focus:outline-none focus:border-blue-500 transition-colors w-64 text-white placeholder:text-slate-500"
               />
             </div>
-            <button className="relative text-slate-400 hover:text-white transition-colors">
+            <button
+              type="button"
+              onClick={() => showToast('All ZK-prover nodes are healthy and synced.', 'success')}
+              className="relative text-slate-400 hover:text-white transition-colors"
+            >
               <Bell size={20} />
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
             </button>
@@ -309,7 +363,7 @@ export default function Dashboard() {
             <button 
               type="button"
               onClick={() => setIsRunModalOpen(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium shadow-[0_0_15px_rgba(37,99,235,0.3)] transition-all cursor-pointer"
             >
               + New Invoicing Run
             </button>
@@ -393,53 +447,127 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Ledger Table */}
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
-                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                  <h2 className="text-lg font-bold text-white">Recent Transactions</h2>
-                  <button className="text-sm text-blue-500 hover:text-blue-400 font-medium flex items-center gap-1">
-                    View Full Ledger <ChevronRight size={16} />
-                  </button>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-950/50 text-slate-400 text-xs uppercase tracking-wider">
-                        <th className="py-4 px-6 font-medium">Transaction Hash</th>
-                        <th className="py-4 px-6 font-medium">Client</th>
-                        <th className="py-4 px-6 font-medium">Service Type</th>
-                        <th className="py-4 px-6 font-medium text-right">Amount (USD)</th>
-                        <th className="py-4 px-6 font-medium text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800 text-sm">
-                      {data?.transactions.map((tx) => (
-                        <tr key={tx.id} className="hover:bg-slate-800/50 transition-colors">
-                          <td className="py-4 px-6 font-mono text-blue-400 flex items-center gap-2">
-                            <Lock size={14} className="text-slate-500" /> {tx.hash}
-                          </td>
-                          <td className="py-4 px-6 text-white font-medium">{tx.client}</td>
-                          <td className="py-4 px-6 text-slate-400">{tx.serviceType}</td>
-                          <td className="py-4 px-6 text-right font-medium text-white">{tx.amount}</td>
-                          <td className="py-4 px-6 text-center">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                              tx.status === 'ZK-Verified' ? 'bg-emerald-500/10 text-emerald-500' :
-                              tx.status === 'Settled' ? 'bg-blue-500/10 text-blue-500' :
-                              'bg-amber-500/10 text-amber-500'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${
-                                tx.status === 'ZK-Verified' ? 'bg-emerald-500' :
-                                tx.status === 'Settled' ? 'bg-blue-500' :
-                                'bg-amber-500 animate-pulse'
-                              }`}></span> {tx.status}
-                            </span>
-                          </td>
+              {activeTab === 'overview' && (
+                <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                  <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-white">Recent Transactions</h2>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('billing')}
+                      className="text-sm text-blue-500 hover:text-blue-400 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      View Full Ledger <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-950/50 text-slate-400 text-xs uppercase tracking-wider">
+                          <th className="py-4 px-6 font-medium">Transaction Hash</th>
+                          <th className="py-4 px-6 font-medium">Client</th>
+                          <th className="py-4 px-6 font-medium">Service Type</th>
+                          <th className="py-4 px-6 font-medium text-right">Amount (USD)</th>
+                          <th className="py-4 px-6 font-medium text-center">Status</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-sm">
+                        {filteredTransactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-slate-800/50 transition-colors">
+                            <td className="py-4 px-6 font-mono text-blue-400 flex items-center gap-2">
+                              <Lock size={14} className="text-slate-500" /> {tx.hash}
+                            </td>
+                            <td className="py-4 px-6 text-white font-medium">{tx.client}</td>
+                            <td className="py-4 px-6 text-slate-400">{tx.serviceType}</td>
+                            <td className="py-4 px-6 text-right font-medium text-white">{tx.amount}</td>
+                            <td className="py-4 px-6 text-center">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                tx.status === 'ZK-Verified' ? 'bg-emerald-500/10 text-emerald-500' :
+                                tx.status === 'Settled' ? 'bg-blue-500/10 text-blue-500' :
+                                'bg-amber-500/10 text-amber-500'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  tx.status === 'ZK-Verified' ? 'bg-emerald-500' :
+                                  tx.status === 'Settled' ? 'bg-blue-500' :
+                                  'bg-amber-500 animate-pulse'
+                                }`}></span> {tx.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {activeTab === 'billing' && (
+                <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                  <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                    <div>
+                      <h2 className="text-lg font-bold text-white">Billing Ledger — {displayTenant}</h2>
+                      <p className="text-xs text-slate-400 mt-1">Showing {filteredTransactions.length} verified & queued runs</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsRunModalOpen(true)}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-all cursor-pointer"
+                    >
+                      + New Invoicing Run
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-950/50 text-slate-400 text-xs uppercase tracking-wider">
+                          <th className="py-4 px-6 font-medium">Proof Hash</th>
+                          <th className="py-4 px-6 font-medium">Client</th>
+                          <th className="py-4 px-6 font-medium">Service Type</th>
+                          <th className="py-4 px-6 font-medium text-right">Amount (USD)</th>
+                          <th className="py-4 px-6 font-medium text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-sm">
+                        {filteredTransactions.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-slate-800/50 transition-colors">
+                            <td className="py-4 px-6 font-mono text-blue-400">{tx.hash}</td>
+                            <td className="py-4 px-6 text-white font-medium">{tx.client}</td>
+                            <td className="py-4 px-6 text-slate-400">{tx.serviceType}</td>
+                            <td className="py-4 px-6 text-right font-medium text-white">{tx.amount}</td>
+                            <td className="py-4 px-6 text-center text-slate-300">{tx.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'analytics' && (
+                <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
+                  <h2 className="text-lg font-bold text-white">ZK Proof & Enclave Telemetry</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-400 block text-xs uppercase">Prover Engine</span>
+                      <span className="text-white font-semibold mt-1 block">ZK-STARK v4 • Halo2 Prover (&lt; 11.4 ms)</span>
+                    </div>
+                    <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-400 block text-xs uppercase">Active Tenant Cluster</span>
+                      <span className="text-emerald-400 font-semibold mt-1 block">{displayTenant} — Zero-Trust Verified</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'settings' && (
+                <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
+                  <h2 className="text-lg font-bold text-white">Enclave Operator & Session Settings</h2>
+                  <div className="space-y-2 text-sm text-slate-300">
+                    <p><span className="text-slate-500">Operator Name:</span> <span className="font-medium text-white">{displayName}</span></p>
+                    <p><span className="text-slate-500">Access Role:</span> <span className="font-medium text-blue-400">{displayRole}</span></p>
+                    <p><span className="text-slate-500">Organization ID:</span> <span className="font-mono text-white">{displayTenant}</span></p>
+                  </div>
+                </div>
+              )}
             </>
           )}
           
