@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, ReceiptText, BarChart3, Settings, LogOut, 
   ShieldCheck, Search, Bell, User, Cpu, DollarSign, Hourglass, 
-  ChevronRight, Lock, Activity, Loader2, X, PlusCircle
+  ChevronRight, Lock, Activity, Loader2, X, PlusCircle, 
+  CheckCircle2, AlertCircle
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
@@ -24,11 +25,17 @@ interface DashboardData {
   transactions: TransactionItem[];
 }
 
+interface ToastState {
+  message: string;
+  type: 'success' | 'error';
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, token, logoutSession } = useAuth()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<DashboardData | null>(null)
+  const [toast, setToast] = useState<ToastState | null>(null)
 
   // Modal states for "+ New Invoicing Run"
   const [isRunModalOpen, setIsRunModalOpen] = useState(false)
@@ -40,6 +47,16 @@ export default function Dashboard() {
   const displayName = user?.name || 'Priyanka'
   const displayRole = user?.role || 'Security Admin'
   const displayTenant = user?.tenantName || 'Company A'
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+  }
+
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 3500)
+    return () => clearTimeout(timer)
+  }, [toast])
 
   // 🔄 Backend se real data fetch karne ka function
   useEffect(() => {
@@ -71,6 +88,7 @@ export default function Dashboard() {
           ]
         })
         setLoading(false)
+        showToast('Backend offline — displaying local enclave fallback data.', 'error')
       }
     }
 
@@ -98,7 +116,7 @@ export default function Dashboard() {
   const handleCreateInvoicingRun = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!clientName.trim() || !amount.trim()) {
-      alert('Please enter both Client Name and Amount.')
+      showToast('Please enter both Client Organization and Billing Amount.', 'error')
       return
     }
 
@@ -142,6 +160,7 @@ export default function Dashboard() {
           transactions: [createdItem, ...prev.transactions]
         }
       })
+      showToast(`Invoicing run queued for ${createdItem.client}.`, 'success')
     } catch (error) {
       console.error("Invoicing run API unavailable, adding locally:", error)
       setData((prev) => {
@@ -153,6 +172,7 @@ export default function Dashboard() {
           transactions: [newTransaction, ...prev.transactions]
         }
       })
+      showToast(`Added ${newTransaction.client} locally (API offline).`, 'success')
     } finally {
       setSubmittingRun(false)
       setClientName('')
@@ -164,6 +184,31 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex">
+      {/* Floating Toast Notification */}
+      {toast && (
+        <div
+          className={`fixed top-20 right-6 z-[60] flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-md text-sm font-medium ${
+            toast.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-300'
+              : 'bg-red-950/90 border-red-500/40 text-red-300'
+          }`}
+        >
+          {toast.type === 'success' ? (
+            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle size={18} className="text-red-400 shrink-0" />
+          )}
+          <span>{toast.message}</span>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="text-slate-400 hover:text-white transition-colors ml-1"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-72 bg-slate-900 border-r border-slate-800 z-50 flex flex-col justify-between py-6 shadow-xl">
         <div className="flex flex-col gap-8">
@@ -271,9 +316,45 @@ export default function Dashboard() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-24">
-              <Loader2 className="animate-spin text-blue-500" size={40} />
-            </div>
+            <>
+              {/* Stats Skeleton Loaders */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 animate-pulse">
+                {[0, 1, 2].map((cardIdx) => (
+                  <div
+                    key={cardIdx}
+                    className="bg-slate-900 rounded-2xl p-6 border border-slate-800 flex flex-col justify-between h-40"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="h-3 w-28 bg-slate-800 rounded" />
+                      <div className="h-9 w-9 bg-slate-800 rounded-lg" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-9 w-24 bg-slate-800 rounded" />
+                      <div className="h-3.5 w-32 bg-slate-800/80 rounded" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Table Skeleton Loader */}
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden animate-pulse">
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+                  <div className="h-5 w-44 bg-slate-800 rounded" />
+                  <div className="h-4 w-24 bg-slate-800 rounded" />
+                </div>
+                <div className="divide-y divide-slate-800">
+                  {[0, 1, 2].map((rowIdx) => (
+                    <div key={rowIdx} className="px-6 py-4 flex items-center justify-between gap-4">
+                      <div className="h-4 w-28 bg-slate-800 rounded" />
+                      <div className="h-4 w-40 bg-slate-800 rounded" />
+                      <div className="h-4 w-32 bg-slate-800 rounded" />
+                      <div className="h-4 w-24 bg-slate-800 rounded" />
+                      <div className="h-6 w-20 bg-slate-800 rounded-full" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
           ) : (
             <>
               {/* Stats Cards */}
