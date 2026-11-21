@@ -88,3 +88,7 @@ This is our internship Project
 
 ## Session & Auth Context
 - Added dynamic user session state and protected route fallback handling.
+
+
+## Redis Lock TTL & Retry
+- Configured lock expiration TTL and automatic retry backoff for concurrent requests.
