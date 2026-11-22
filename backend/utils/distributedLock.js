@@ -11,12 +11,12 @@ const RELEASE_LOCK_SCRIPT = `
 `;
 
 /**
- * Acquire a distributed lock for a specific resource (e.g., tenantId:accountId)
- * @param {string} resourceKey - Unique key for the resource being locked
- * @param {number} ttlMs - Lock auto-expiry time in milliseconds (default 10s)
- * @param {number} retryCount - Number of retry attempts if locked
- * @param {number} retryDelayMs - Delay between retries in milliseconds
- * @returns {Promise<string|null>} Lock token if acquired, or null if busy
+- Acquire a distributed lock for a specific resource (e.g., tenantId:accountId)
+- @param {string} resourceKey - Unique key for the resource being locked
+- @param {number} ttlMs - Lock auto-expiry time in milliseconds (default 10s)
+- @param {number} retryCount - Number of retry attempts if locked
+- @param {number} retryDelayMs - Delay between retries in milliseconds
+- @returns {Promise<string|null>} Lock token if acquired, or null if busy
  */
 async function acquireLock(resourceKey, ttlMs = 10000, retryCount = 5, retryDelayMs = 100) {
   const lockKey = `lock:${resourceKey}`;
@@ -36,10 +36,10 @@ async function acquireLock(resourceKey, ttlMs = 10000, retryCount = 5, retryDela
 }
 
 /**
- * Release a distributed lock safely using its owner token
- * @param {string} resourceKey - Same resource key used to acquire the lock
- * @param {string} token - Owner token returned by acquireLock
- * @returns {Promise<boolean>} True if released, false if expired or owned by another process
+- Release a distributed lock safely using its owner token
+- @param {string} resourceKey - Same resource key used to acquire the lock
+- @param {string} token - Owner token returned by acquireLock
+- @returns {Promise<boolean>} True if released, false if expired or owned by another process
  */
 async function releaseLock(resourceKey, token) {
   const lockKey = `lock:${resourceKey}`;
@@ -48,15 +48,16 @@ async function releaseLock(resourceKey, token) {
 }
 
 /**
- * Helper wrapper to run a critical section inside a distributed lock
+- Helper wrapper to run a critical section inside a distributed lock
  */
 async function withLock(resourceKey, fn, options = {}) {
   const { ttlMs = 10000, retryCount = 5, retryDelayMs = 100 } = options;
   const token = await acquireLock(resourceKey, ttlMs, retryCount, retryDelayMs);
 
   if (!token) {
-    const err = new Error(`Resource is currently locked: ${resourceKey}`);
+    const err = new Error("Another request for this event is in progress. Please retry.");
     err.statusCode = 409;
+    err.code = "REQUEST_IN_PROGRESS";
     throw err;
   }
 
