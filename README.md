@@ -96,3 +96,8 @@ This is our internship Project
 
 ## Billing Ledger Filtering
 - Added status and date filters for audit logs and transaction history views.
+
+
+## Week 3: Audit Trail & Export
+- Added CSV and JSON export support for verified billing ledger entries.
+- Improved timestamp formatting across transaction history views.
