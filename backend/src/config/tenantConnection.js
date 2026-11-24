@@ -22,4 +22,10 @@ const getTenantConnection = async (tenantId) => {
   return base.useDb(`ledgerguard_${tenantId}`, { useCache: true });
 };
 
-module.exports = { getTenantConnection };
+// Control database: stores companies and users (not billing data)
+const getControlConnection = async () => {
+  const base = await getBase();
+  return base.useDb("ledgerguard_control", { useCache: true });
+};
+
+module.exports = { getTenantConnection, getControlConnection };
