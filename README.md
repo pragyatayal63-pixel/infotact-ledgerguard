@@ -101,3 +101,8 @@ This is our internship Project
 ## Week 3: Audit Trail & Export
 - Added CSV and JSON export support for verified billing ledger entries.
 - Improved timestamp formatting across transaction history views.
+
+
+## Concurrency & Deadlock Safeguards
+- Added Redis lock ownership token checks before releasing active locks.
+- Handled lock renewal edge cases during batch invoicing runs.
