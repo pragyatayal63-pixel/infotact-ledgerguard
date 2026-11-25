@@ -106,3 +106,8 @@ This is our internship Project
 ## Concurrency & Deadlock Safeguards
 - Added Redis lock ownership token checks before releasing active locks.
 - Handled lock renewal edge cases during batch invoicing runs.
+
+
+## Analytics & Error Metrics
+- Added lock contention rate and failed transaction counters to analytics summary.
+- Standardized empty-state cards for filtered ledger queries.
