@@ -111,3 +111,7 @@ This is our internship Project
 ## Analytics & Error Metrics
 - Added lock contention rate and failed transaction counters to analytics summary.
 - Standardized empty-state cards for filtered ledger queries.
+
+
+## Role-Based Access Guards
+- Added admin and auditor permission checks on sensitive ledger endpoints.
