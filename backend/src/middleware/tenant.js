@@ -1,20 +1,15 @@
 const { getTenantConnection } = require("../config/tenantConnection");
 const { getModels } = require("../models");
+const { httpError } = require("../utils/httpError");
 
-// TEMPORARY MOCK: later Member 1's JWT middleware will supply the tenantId.
-// Replace only the line that reads the header; the rest stays.
+// Runs AFTER authenticate: switches to the tenant named inside the JWT
 const tenantMiddleware = async (req, res, next) => {
   try {
-    const tenantId = req.header("x-tenant-id");
-    if (!tenantId || !/^[a-z0-9_-]{2,30}$/i.test(tenantId)) {
-      const err = new Error("A valid x-tenant-id header is required");
-      err.statusCode = 400;
-      err.code = "TENANT_ID_INVALID";
-      return next(err);
+    if (!req.tenantId) {
+      throw httpError(401, "AUTH_REQUIRED", "Authentication is required");
     }
 
-    const db = await getTenantConnection(tenantId.toLowerCase());
-    req.tenantId = tenantId.toLowerCase();
+    const db = await getTenantConnection(req.tenantId);
     req.db = db;
     req.models = getModels(db);
     next();
@@ -23,4 +18,4 @@ const tenantMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = tenantMiddleware;
+module.exports = tenantMiddleware;  
