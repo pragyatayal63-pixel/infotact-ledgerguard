@@ -2,17 +2,26 @@ import React, { useState } from 'react';
 import {
   FileCheck2,
   RotateCcw,
+  ShieldAlert,
+  Play,
+  CheckCircle2,
+  AlertOctagon,
+  Sparkles,
 } from 'lucide-react';
-import type { AuditLog, Tenant } from '../../types/dashboard';
+import type { AuditLog, Tenant, BillingTransaction } from '../../types/dashboard';
 
 interface AuditResiliencyViewProps {
   logs: AuditLog[];
   activeTenant: Tenant;
+  onOpenRecordModal?: () => void;
+  transactions?: BillingTransaction[];
 }
 
 export const AuditResiliencyView: React.FC<AuditResiliencyViewProps> = ({
   logs,
   activeTenant,
+  onOpenRecordModal,
+  transactions = [],
 }) => {
   const [filterType, setFilterType] = useState<string>('all');
 
@@ -26,10 +35,72 @@ export const AuditResiliencyView: React.FC<AuditResiliencyViewProps> = ({
 
   const successCount = logs.filter((l) => l.status === 'SUCCESS').length;
   const rollbackCount = logs.filter((l) => l.status === 'ROLLBACK').length;
+  const activeTxRollbacks = transactions.filter((t) => t.status === 'rolled_back').length;
+  const activeTxFailed = transactions.filter((t) => t.status === 'failed').length;
+  const activeTxPending = transactions.filter((t) => t.status === 'pending' || t.status === 'processing').length;
+  const activeTxCommitted = transactions.filter((t) => t.status === 'committed').length;
 
   return (
     <div className="space-y-6">
-      {/* 4 Summary Cards */}
+      {/* Mid-Project Review State Resiliency Hero Banner */}
+      <div className="bg-gradient-to-r from-blue-900 to-slate-900 rounded-2xl p-6 text-white shadow-md relative overflow-hidden border border-blue-800/60">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-400/30">
+              <Sparkles size={13} className="text-amber-400" />
+              <span>Mid-Project Review Primary Demo: State Resiliency &amp; Rollback</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              Zero-Knowledge Transaction State Resiliency Hub
+            </h2>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Demonstrating fail-safe financial ledger states. When simulated network drops or quota exceptions occur, multi-document write sessions trigger atomic rollbacks, preventing orphan charges and ensuring zero balance corruption for <strong className="text-white">{activeTenant.name}</strong>.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+            {onOpenRecordModal && (
+              <button
+                onClick={onOpenRecordModal}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+              >
+                <Play size={14} className="fill-white" />
+                <span>Trigger Resiliency Demo</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Status Callout Pill */}
+        <div className="mt-4 pt-3.5 border-t border-slate-700/60 flex flex-wrap items-center gap-4 text-xs text-slate-300">
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            Committed in Ledger: <strong className="text-emerald-300 ml-1">{activeTxCommitted}</strong>
+          </span>
+          <span className="flex items-center gap-1.5 font-medium">
+            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            Safely Rolled Back: <strong className="text-amber-300 ml-1">{activeTxRollbacks}</strong>
+          </span>
+          {activeTxPending > 0 && (
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+              Pending in Lock: <strong className="text-blue-300 ml-1">{activeTxPending}</strong>
+            </span>
+          )}
+          {activeTxFailed > 0 && (
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+              Failed Validation: <strong className="text-rose-300 ml-1">{activeTxFailed}</strong>
+            </span>
+          )}
+          <span className="text-[11px] text-slate-400 ml-auto flex items-center gap-1">
+            <ShieldAlert size={12} className="text-amber-400" />
+            Simulation Notice: UI simulation clearly distinguished from live production DB locks
+          </span>
+        </div>
+      </div>
+
+      {/* 4 Summary Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs">
           <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -80,17 +151,51 @@ export const AuditResiliencyView: React.FC<AuditResiliencyViewProps> = ({
         </div>
       </div>
 
-      {/* State Resiliency Info Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs">
-        <div className="flex items-center gap-2 mb-1.5">
-          <RotateCcw size={16} className="text-blue-600" />
-          <h3 className="font-bold text-slate-900 text-sm">
-            State Resiliency &amp; Automatic Rollback Safeguards
-          </h3>
+      {/* State Resiliency Architecture Info Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <RotateCcw size={16} className="text-blue-600" />
+            <h3 className="font-bold text-slate-900 text-sm">
+              State Resiliency &amp; Automatic Rollback Safeguards
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold text-slate-500 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200">
+            Audit Checklist &bull; Mid-Project Review
+          </span>
         </div>
-        <p className="text-xs text-slate-500 leading-relaxed max-w-3xl">
-          LedgerGuard guards financial consistency during network dropouts. If a transaction fails mid-flight, isolated database locks automatically expire and multi-document write sessions revert state to prevent orphan debits.
+        <p className="text-xs text-slate-600 leading-relaxed">
+          LedgerGuard guards financial consistency during mid-flight network dropouts. If a transaction fails mid-flight, isolated database locks auto-expire and multi-document write sessions revert state to prevent orphan debits.
         </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+            <p className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
+              <CheckCircle2 size={13} className="text-emerald-600" />
+              1. Single-Charge Idempotency
+            </p>
+            <p className="text-slate-500 text-[11px] leading-relaxed">
+              Every request is assigned a unique event ID and processed under a distributed mutex lock to prevent duplicate charges.
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+            <p className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
+              <RotateCcw size={13} className="text-amber-600" />
+              2. Atomic Multi-Doc Rollback
+            </p>
+            <p className="text-slate-500 text-[11px] leading-relaxed">
+              Mid-flight network dropouts automatically abort MongoDB transactions, reverting balance updates with 100% atomicity.
+            </p>
+          </div>
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs">
+            <p className="font-semibold text-slate-900 flex items-center gap-1.5 mb-1">
+              <AlertOctagon size={13} className="text-rose-600" />
+              3. Non-Rollback Validation Fails
+            </p>
+            <p className="text-slate-500 text-[11px] leading-relaxed">
+              Pre-flight validation failures and quota exceptions reject without entering write sessions, leaving balances untouched.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Logs Table Card */}
@@ -99,7 +204,7 @@ export const AuditResiliencyView: React.FC<AuditResiliencyViewProps> = ({
           <div>
             <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
               <FileCheck2 size={18} className="text-blue-600" />
-              System Activity Logs
+              System Activity &amp; Resiliency Audit Logs
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Recent events and operational audit stream for {activeTenant.name}

@@ -33,7 +33,7 @@ export const ExecutiveHeader: React.FC<ExecutiveHeaderProps> = ({
         </div>
 
         <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-          Welcome back, <span className="font-semibold text-slate-700">{user.name}</span>. Multi-tenant zero-knowledge billing engine monitoring resource expenditures and real-time usage quotas.
+          Welcome back, <span className="font-semibold text-slate-700">{user.name}</span>. Multi-tenant zero-knowledge billing engine monitoring database isolation, distributed mutex locks, and transaction rollback resiliency.
         </p>
       </div>
 

@@ -13,12 +13,16 @@ interface SummaryCardsProps {
   activeTenant: Tenant;
   committedCount: number;
   rolledBackCount: number;
+  pendingCount?: number;
+  failedCount?: number;
 }
 
 export const SummaryCards: React.FC<SummaryCardsProps> = ({
   activeTenant,
   committedCount,
   rolledBackCount,
+  pendingCount = 0,
+  failedCount = 0,
 }) => {
   const usagePercentage = Math.round(
     (activeTenant.currentSpend / activeTenant.monthlyBudget) * 100
@@ -114,8 +118,13 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
             <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
               {committedCount} Committed
             </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Rolled Back: <span className="font-semibold text-amber-600">{rolledBackCount}</span>
+            <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
+              <span>Rolled Back: <strong className="text-amber-600 font-semibold">{rolledBackCount}</strong></span>
+              {(pendingCount > 0 || failedCount > 0) && (
+                <span className="text-[11px] text-slate-400">
+                  ({pendingCount > 0 ? `${pendingCount} pending` : ''}{pendingCount > 0 && failedCount > 0 ? ', ' : ''}{failedCount > 0 ? `${failedCount} failed` : ''})
+                </span>
+              )}
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-export type TransactionStatus = 'committed' | 'rolled_back' | 'processing';
+export type TransactionStatus = 'pending' | 'committed' | 'failed' | 'rolled_back' | 'processing';
 
 export interface Tenant {
   id: string;

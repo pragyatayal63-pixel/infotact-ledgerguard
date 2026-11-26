@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Clock,
   RotateCcw,
+  AlertOctagon,
   FileSpreadsheet,
   Plus,
   ChevronLeft,
@@ -27,7 +28,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
   onSearchChange,
   onOpenRecordModal,
 }) => {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'committed' | 'rolled_back'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'committed' | 'pending' | 'failed' | 'rolled_back'>('all');
   const [selectedTx, setSelectedTx] = useState<BillingTransaction | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 6;
@@ -137,7 +138,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
           </div>
 
           {/* Status Tabs */}
-          <div className="flex items-center bg-slate-100/80 p-1 rounded-xl text-xs font-semibold self-start md:self-auto">
+          <div className="flex items-center flex-wrap bg-slate-100/80 p-1 rounded-xl text-xs font-semibold self-start md:self-auto gap-1">
             <button
               onClick={() => {
                 setStatusFilter('all');
@@ -163,6 +164,32 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
               }`}
             >
               Committed
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter('pending');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'pending'
+                  ? 'bg-white text-blue-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Pending
+            </button>
+            <button
+              onClick={() => {
+                setStatusFilter('failed');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'failed'
+                  ? 'bg-white text-rose-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Failed
             </button>
             <button
               onClick={() => {
@@ -239,9 +266,14 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                           <RotateCcw size={11} /> Rolled Back
                         </span>
                       )}
-                      {tx.status === 'processing' && (
+                      {(tx.status === 'processing' || tx.status === 'pending') && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                          <Clock size={11} /> Processing
+                          <Clock size={11} className="animate-spin" /> {tx.status === 'pending' ? 'Pending' : 'Processing'}
+                        </span>
+                      )}
+                      {tx.status === 'failed' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <AlertOctagon size={11} /> Failed
                         </span>
                       )}
                     </td>
@@ -344,9 +376,30 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                 <span className="text-slate-500">Amount</span>
                 <span className="font-bold text-slate-900">{formatUSD(selectedTx.amount)}</span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
+              <div className="flex justify-between py-1 border-b border-slate-100 items-center">
                 <span className="text-slate-500">Status</span>
-                <span className="font-semibold capitalize text-slate-900">{selectedTx.status.replace('_', ' ')}</span>
+                <span className="font-semibold text-slate-900">
+                  {selectedTx.status === 'committed' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <CheckCircle2 size={10} /> Committed
+                    </span>
+                  )}
+                  {selectedTx.status === 'rolled_back' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                      <RotateCcw size={10} /> Rolled Back
+                    </span>
+                  )}
+                  {(selectedTx.status === 'processing' || selectedTx.status === 'pending') && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                      <Clock size={10} className="animate-spin" /> {selectedTx.status === 'pending' ? 'Pending' : 'Processing'}
+                    </span>
+                  )}
+                  {selectedTx.status === 'failed' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                      <AlertOctagon size={10} /> Failed
+                    </span>
+                  )}
+                </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Reference</span>

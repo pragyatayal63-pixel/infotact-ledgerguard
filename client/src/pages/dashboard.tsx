@@ -53,6 +53,8 @@ export default function Dashboard() {
 
   const committedCount = tenantTransactions.filter((t) => t.status === 'committed').length;
   const rolledBackCount = tenantTransactions.filter((t) => t.status === 'rolled_back').length;
+  const pendingCount = tenantTransactions.filter((t) => t.status === 'pending' || t.status === 'processing').length;
+  const failedCount = tenantTransactions.filter((t) => t.status === 'failed').length;
 
   const currentResources =
     demoResourceMetrics[activeTenant.id] || demoResourceMetrics['tenant-acme'];
@@ -60,6 +62,77 @@ export default function Dashboard() {
     demoHistoricalUsage[activeTenant.id] || demoHistoricalUsage['tenant-acme'];
   const currentServiceExpenses =
     demoServiceExpenses[activeTenant.id] || demoServiceExpenses['tenant-acme'];
+
+  // Handle updating an existing transaction's status (for real-time lifecycle simulations)
+  const handleUpdateTransactionStatus = (id: string, newStatus: BillingTransaction['status'], notes?: string) => {
+    let affectedTx: BillingTransaction | undefined;
+
+    setTransactionsMap((prev) => {
+      const list = prev[activeTenant.id] || [];
+      const updatedList = list.map((tx) => {
+        if (tx.id === id) {
+          const oldStatus = tx.status;
+          affectedTx = {
+            ...tx,
+            status: newStatus,
+            notes: notes !== undefined ? notes : tx.notes,
+          };
+
+          // If transitioning to committed from non-committed, increment spend
+          if (newStatus === 'committed' && oldStatus !== 'committed') {
+            setActiveTenant((t) => ({
+              ...t,
+              currentSpend: parseFloat((t.currentSpend + tx.amount).toFixed(2)),
+            }));
+          }
+          // If a committed transaction were reverted to rolled_back, decrement spend
+          else if (oldStatus === 'committed' && (newStatus === 'rolled_back' || newStatus === 'failed')) {
+            setActiveTenant((t) => ({
+              ...t,
+              currentSpend: parseFloat(Math.max(0, t.currentSpend - tx.amount).toFixed(2)),
+            }));
+          }
+
+          return affectedTx;
+        }
+        return tx;
+      });
+
+      return {
+        ...prev,
+        [activeTenant.id]: updatedList,
+      };
+    });
+
+    if (affectedTx) {
+      const notifType: NotificationItem['type'] =
+        newStatus === 'committed' ? 'success' : newStatus === 'rolled_back' ? 'rollback' : 'alert';
+
+      const titleMap = {
+        committed: 'Transaction Committed',
+        rolled_back: 'State Safely Rolled Back',
+        failed: 'Transaction Failed',
+        pending: 'Transaction Pending',
+        processing: 'Transaction Processing',
+      };
+
+      const newNotif: NotificationItem = {
+        id: `notif-${Date.now()}`,
+        title: titleMap[newStatus] || 'Transaction Status Updated',
+        message:
+          newStatus === 'rolled_back'
+            ? `Event ${affectedTx.eventId} encountered mid-flight timeout and safely rolled back without balance deduction.`
+            : newStatus === 'failed'
+            ? `Event ${affectedTx.eventId} failed validation with zero balance deduction.`
+            : `Event ${affectedTx.eventId} committed successfully for ${activeTenant.name}.`,
+        time: 'Just now',
+        read: false,
+        type: notifType,
+      };
+
+      setNotifications((prev) => [newNotif, ...prev]);
+    }
+  };
 
   // Handle new transaction from record modal
   const handleCommitTransaction = (newTx: BillingTransaction) => {
@@ -76,13 +149,31 @@ export default function Dashboard() {
     }
 
     // Add notification
+    const notifType: NotificationItem['type'] =
+      newTx.status === 'committed'
+        ? 'success'
+        : newTx.status === 'rolled_back'
+        ? 'rollback'
+        : newTx.status === 'failed'
+        ? 'alert'
+        : 'info';
+
+    const title =
+      newTx.status === 'committed'
+        ? 'Event Recorded'
+        : newTx.status === 'rolled_back'
+        ? 'Rollback Event Handled'
+        : newTx.status === 'failed'
+        ? 'Transaction Failed'
+        : 'Transaction Initiated (Pending)';
+
     const newNotif: NotificationItem = {
       id: `notif-${Date.now()}`,
-      title: newTx.status === 'committed' ? 'Event Recorded' : 'Rollback Event Handled',
+      title,
       message: `${newTx.serviceName} (${newTx.units}) recorded for ${activeTenant.name}.`,
       time: 'Just now',
       read: false,
-      type: newTx.status === 'committed' ? 'success' : 'rollback',
+      type: notifType,
     };
 
     setNotifications((prev) => [newNotif, ...prev]);
@@ -162,19 +253,15 @@ export default function Dashboard() {
                 activeTenant={activeTenant}
                 committedCount={committedCount}
                 rolledBackCount={rolledBackCount}
+                pendingCount={pendingCount}
+                failedCount={failedCount}
               />
 
-              {/* Analytics Charts: Historical Line + Service Doughnut */}
-              <UsageChart
+              {/* Mid-Project Review Focus: Dynamic Tenant DB Isolation & Switching Benchmark */}
+              <DatabasePoolStatus
+                tenants={demoTenants}
                 activeTenant={activeTenant}
-                historicalData={currentHistorical}
-                serviceExpenses={currentServiceExpenses}
-              />
-
-              {/* Active Resource Consumption & Quotas */}
-              <ResourceLimitsGauge
-                activeTenant={activeTenant}
-                resources={currentResources}
+                onSelectTenant={setActiveTenant}
               />
 
               {/* Idempotent Billing Ledger Table */}
@@ -228,6 +315,8 @@ export default function Dashboard() {
             <AuditResiliencyView
               logs={demoAuditLogs}
               activeTenant={activeTenant}
+              onOpenRecordModal={() => setIsRecordModalOpen(true)}
+              transactions={tenantTransactions}
             />
           )}
 
@@ -244,6 +333,7 @@ export default function Dashboard() {
         onClose={() => setIsRecordModalOpen(false)}
         activeTenant={activeTenant}
         onCommitTransaction={handleCommitTransaction}
+        onUpdateTransactionStatus={handleUpdateTransactionStatus}
       />
     </div>
   );
