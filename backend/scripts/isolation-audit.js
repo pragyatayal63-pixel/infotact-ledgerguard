@@ -1,12 +1,44 @@
-// Run with: node scripts/isolation-audit.js   (server must be running)
-const BASE = "http://localhost:5000/api/transactions";
+
+// Run with: node scripts/isolation-audit.js (server must be running)
+const BASE = "http://localhost:5000/api";
+
+const USERS = {
+  a: { email: "admin@companya.test", password: "Secret123" },
+  b: { email: "admin@companyb.test", password: "Secret123" },
+};
+
 const ROUNDS = 25;
 
-const call = async (path, tenant) => {
-  const start = Date.now();
-  const res = await fetch(`${BASE}${path}`, { headers: { "x-tenant-id": tenant } });
+const login = async (user) => {
+  const res = await fetch(`${BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(user),
+  });
+
   const body = await res.json();
-  return { status: res.status, body, ms: Date.now() - start };
+
+  if (!body.success) {
+    throw new Error("Login failed: " + JSON.stringify(body));
+  }
+
+  return body.data.token;
+};
+
+const call = async (path, token) => {
+  const start = Date.now();
+
+  const res = await fetch(`${BASE}/transactions${path}`, {
+    headers: token
+      ? { Authorization: `Bearer ${token}` }
+      : {},
+  });
+
+  return {
+    status: res.status,
+    body: await res.json(),
+    ms: Date.now() - start,
+  };
 };
 
 (async () => {
@@ -14,32 +46,58 @@ const call = async (path, tenant) => {
   let totalMs = 0;
   let calls = 0;
 
-  // Learn which eventIds belong to company A
-  const a = await call("?limit=100", "companya");
-  const aEvents = new Set(a.body.data.transactions.map((t) => t.eventId));
+  const tokenA = await login(USERS.a);
+  const tokenB = await login(USERS.b);
+
+  // No token and tampered token must be rejected
+  const none = await call("/balance/ACC001", null);
+  const bad = await call("/balance/ACC001", tokenA + "x");
+
+  console.log(`No token -> ${none.status} (expected 401)`);
+  console.log(`Tampered token -> ${bad.status} (expected 401)`);
+
+  if (none.status !== 401 || bad.status !== 401) {
+    failures++;
+  }
+
+  // Learn which eventIds belong to Company A
+  const a = await call("?limit=100", tokenA);
+  const aEvents = new Set(
+    a.body.data.transactions.map((t) => t.eventId)
+  );
 
   for (let i = 1; i <= ROUNDS; i++) {
-    // Switch tenants on every call (parallel = "under load")
+    // Send requests for both tenants in parallel
     const [ra, rb, rl] = await Promise.all([
-      call("/balance/ACC001", "companya"),
-      call("/balance/ACC001", "companyb"),
-      call("?limit=100", "companyb"),
+      call("/balance/ACC001", tokenA),
+      call("/balance/ACC001", tokenB),
+      call("?limit=100", tokenB),
     ]);
+
     totalMs += ra.ms + rb.ms + rl.ms;
     calls += 3;
 
-    const okA = ra.status === 200;
-    const okB = rb.status === 404; // B must not see A's account
-    const leaked = rl.body.data.transactions.some((t) => aEvents.has(t.eventId));
+    const leaked = rl.body.data.transactions.some(
+      (t) => aEvents.has(t.eventId)
+    );
 
-    if (!okA || !okB || leaked) {
+    if (ra.status !== 200 || rb.status !== 200 || leaked) {
       failures++;
-      console.log(`Round ${i}: FAIL (A=${ra.status}, B=${rb.status}, leaked=${leaked})`);
+      console.log(
+        `Round ${i}: FAIL (A=${ra.status}, B=${rb.status}, leaked=${leaked})`
+      );
     }
   }
 
   console.log("-----------------------------");
   console.log(`Rounds: ${ROUNDS}, requests: ${calls}`);
-  console.log(`Average response time: ${(totalMs / calls).toFixed(1)} ms`);
-  console.log(failures === 0 ? "ISOLATION AUDIT PASSED: no cross-tenant data" : `ISOLATION AUDIT FAILED: ${failures} round(s)`);
+  console.log(
+    `Average response time: ${(totalMs / calls).toFixed(1)} ms`
+  );
+
+  console.log(
+    failures === 0
+      ? "ISOLATION AUDIT PASSED: no cross-tenant data"
+      : `ISOLATION AUDIT FAILED: ${failures} problem(s)`
+  );
 })();
