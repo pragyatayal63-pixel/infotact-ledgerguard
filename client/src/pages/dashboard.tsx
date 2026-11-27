@@ -20,6 +20,7 @@ import type {
   Tenant,
   NotificationItem,
 } from '../types/dashboard';
+import type { TransactionRecord, TransactionType } from '../api/types';
 
 import {
   demoTenants,
@@ -85,111 +86,95 @@ export default function Dashboard() {
   const currentServiceExpenses =
     demoServiceExpenses[activeTenant.id] || demoServiceExpenses['tenant-acme'];
 
-  // Handle updating an existing transaction's status (for real-time lifecycle simulations)
-  const handleUpdateTransactionStatus = (id: string, newStatus: BillingTransaction['status'], notes?: string) => {
-    let affectedTx: BillingTransaction | undefined;
 
-    setTransactionsMap((prev) => {
-      const list = prev[activeTenant.id] || [];
-      const updatedList = list.map((tx) => {
-        if (tx.id === id) {
-          const oldStatus = tx.status;
-          affectedTx = {
-            ...tx,
-            status: newStatus,
-            notes: notes !== undefined ? notes : tx.notes,
-          };
-
-          // If transitioning to committed from non-committed, increment spend
-          if (newStatus === 'committed' && oldStatus !== 'committed') {
-            setCurrentSpend((prev) => parseFloat((prev + tx.amount).toFixed(2)));
-          }
-          // If a committed transaction were reverted to rolled_back, decrement spend
-          else if (oldStatus === 'committed' && (newStatus === 'rolled_back' || newStatus === 'failed')) {
-            setCurrentSpend((prev) => parseFloat(Math.max(0, prev - tx.amount).toFixed(2)));
-          }
-
-          return affectedTx;
-        }
-        return tx;
-      });
-
-      return {
-        ...prev,
-        [activeTenant.id]: updatedList,
-      };
-    });
-
-    if (affectedTx) {
-      const notifType: NotificationItem['type'] =
-        newStatus === 'committed' ? 'success' : newStatus === 'rolled_back' ? 'rollback' : 'alert';
-
-      const titleMap = {
-        committed: 'Transaction Committed',
-        rolled_back: 'State Safely Rolled Back',
-        failed: 'Transaction Failed',
-        pending: 'Transaction Pending',
-        processing: 'Transaction Processing',
-      };
-
-      const newNotif: NotificationItem = {
-        id: `notif-${Date.now()}`,
-        title: titleMap[newStatus] || 'Transaction Status Updated',
-        message:
-          newStatus === 'rolled_back'
-            ? `Event ${affectedTx.eventId} encountered mid-flight timeout and safely rolled back without balance deduction.`
-            : newStatus === 'failed'
-            ? `Event ${affectedTx.eventId} failed validation with zero balance deduction.`
-            : `Event ${affectedTx.eventId} committed successfully for ${activeTenant.name}.`,
-        time: 'Just now',
-        read: false,
-        type: notifType,
-      };
-
-      setNotifications((prev) => [newNotif, ...prev]);
-    }
-  };
-
-  // Handle new transaction from record modal
-  const handleCommitTransaction = (newTx: BillingTransaction) => {
-    setTransactionsMap((prev) => ({
-      ...prev,
-      [activeTenant.id]: [newTx, ...(prev[activeTenant.id] || [])],
-    }));
-
-    if (newTx.status === 'committed') {
-      setCurrentSpend((prev) => parseFloat((prev + newTx.amount).toFixed(2)));
-    }
-
-    // Add notification
-    const notifType: NotificationItem['type'] =
-      newTx.status === 'committed'
-        ? 'success'
-        : newTx.status === 'rolled_back'
-        ? 'rollback'
-        : newTx.status === 'failed'
-        ? 'alert'
-        : 'info';
-
-    const title =
-      newTx.status === 'committed'
-        ? 'Event Recorded'
-        : newTx.status === 'rolled_back'
-        ? 'Rollback Event Handled'
-        : newTx.status === 'failed'
-        ? 'Transaction Failed'
-        : 'Transaction Initiated (Pending)';
-
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      title,
-      message: `${newTx.serviceName} (${newTx.units}) recorded for ${activeTenant.name}.`,
-      time: 'Just now',
-      read: false,
-      type: notifType,
+  // Handle live transaction success from API
+  const handleTransactionSuccess = (tx: TransactionRecord, newBalance: number, isReplay: boolean) => {
+    const mappedTx: BillingTransaction = {
+      id: tx._id,
+      eventId: tx.eventId,
+      tenantId: activeTenant.id,
+      serviceName: `${tx.type === 'credit' ? 'Account Credit' : 'Account Debit'} (${tx.currency})`,
+      category: 'Other Services',
+      amount: tx.amount,
+      status: 'committed',
+      timestamp: 'Just now',
+      reference: `TX-${tx.accountId}-${tx._id.slice(-6).toUpperCase()}`,
+      units: `${tx.amount} ${tx.currency}`,
+      notes: isReplay ? 'Idempotent replay: original transaction returned' : 'Single-charge ACID transaction verified',
     };
 
-    setNotifications((prev) => [newNotif, ...prev]);
+    setTransactionsMap((prev) => ({
+      ...prev,
+      [activeTenant.id]: [mappedTx, ...(prev[activeTenant.id] || [])],
+    }));
+
+    setCurrentSpend(newBalance);
+
+    const notif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: isReplay ? 'Idempotent Replay Verified' : 'Transaction Committed',
+      message: isReplay
+        ? `Event ${tx.eventId} was already processed. Single-charge verified; balance unchanged at ${newBalance} ${tx.currency}.`
+        : `Event ${tx.eventId} completed successfully for ${activeTenant.name}. New balance: ${newBalance} ${tx.currency}.`,
+      time: 'Just now',
+      read: false,
+      type: isReplay ? 'info' : 'success',
+    };
+
+    setNotifications((prev) => [notif, ...prev]);
+  };
+
+  // Handle rollback demo from API
+  const handleTransactionRollback = (rollbackInfo: {
+    eventId: string;
+    accountId: string;
+    amount: number;
+    type: TransactionType;
+    currency: string;
+    timestamp: string;
+    reason: string;
+  }) => {
+    const rollbackTx: BillingTransaction = {
+      id: `rollback-${Date.now()}`,
+      eventId: rollbackInfo.eventId,
+      tenantId: activeTenant.id,
+      serviceName: `Simulated Failure Abort (${rollbackInfo.type.toUpperCase()})`,
+      category: 'Other Services',
+      amount: rollbackInfo.amount,
+      status: 'rolled_back',
+      timestamp: 'Just now',
+      reference: `ROLLBACK-${rollbackInfo.accountId}`,
+      units: `${rollbackInfo.amount} ${rollbackInfo.currency}`,
+      notes: 'Simulated failure aborted by backend. Zero balance deduction.',
+    };
+
+    setTransactionsMap((prev) => ({
+      ...prev,
+      [activeTenant.id]: [rollbackTx, ...(prev[activeTenant.id] || [])],
+    }));
+
+    const notif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title: 'State Safely Rolled Back',
+      message: `Event ${rollbackInfo.eventId} triggered simulated failure. Multi-document transaction aborted with zero balance deduction.`,
+      time: 'Just now',
+      read: false,
+      type: 'rollback',
+    };
+
+    setNotifications((prev) => [notif, ...prev]);
+  };
+
+  const handleErrorNotification = (title: string, message: string) => {
+    const notif: NotificationItem = {
+      id: `notif-${Date.now()}`,
+      title,
+      message,
+      time: 'Just now',
+      read: false,
+      type: 'alert',
+    };
+    setNotifications((prev) => [notif, ...prev]);
   };
 
   const handleMarkNotificationsAsRead = () => {
@@ -340,13 +325,14 @@ export default function Dashboard() {
         </main>
       </div>
 
-      {/* Record Demo Event Modal */}
+      {/* Record Transaction Modal */}
       <AddTransactionModal
         isOpen={isRecordModalOpen}
         onClose={() => setIsRecordModalOpen(false)}
         activeTenant={activeTenant}
-        onCommitTransaction={handleCommitTransaction}
-        onUpdateTransactionStatus={handleUpdateTransactionStatus}
+        onTransactionSuccess={handleTransactionSuccess}
+        onTransactionRollback={handleTransactionRollback}
+        onErrorNotification={handleErrorNotification}
       />
     </div>
   );
