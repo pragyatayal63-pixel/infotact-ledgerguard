@@ -15,6 +15,7 @@ interface SummaryCardsProps {
   rolledBackCount: number;
   pendingCount?: number;
   failedCount?: number;
+  realBalance?: { accountId: string; balance: number; currency: string } | null;
 }
 
 export const SummaryCards: React.FC<SummaryCardsProps> = ({
@@ -23,19 +24,21 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
   rolledBackCount,
   pendingCount = 0,
   failedCount = 0,
+  realBalance,
 }) => {
+  const currentAmount = realBalance ? realBalance.balance : activeTenant.currentSpend;
   const usagePercentage = Math.round(
-    (activeTenant.currentSpend / activeTenant.monthlyBudget) * 100
+    (currentAmount / activeTenant.monthlyBudget) * 100
   );
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-      {/* Card 1: Current Billing Spend */}
+      {/* Card 1: Current Billing Spend / Real Balance */}
       <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs hover:shadow-sm transition-all flex flex-col justify-between">
         <div>
           <div className="flex items-start justify-between">
             <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">
-              Current Billing Spend
+              {realBalance ? `Account Balance (${realBalance.accountId})` : 'Current Billing Spend'}
             </span>
             <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
               <CreditCard size={17} />
@@ -44,7 +47,7 @@ export const SummaryCards: React.FC<SummaryCardsProps> = ({
 
           <div className="mt-2.5">
             <h3 className="text-2xl font-bold text-slate-900 tracking-tight">
-              {formatUSD(activeTenant.currentSpend)}
+              {realBalance ? `${realBalance.balance.toFixed(2)} ${realBalance.currency}` : formatUSD(activeTenant.currentSpend)}
             </h3>
             <p className="text-xs text-slate-500 mt-1">
               Monthly Budget: <span className="font-semibold text-slate-700">{formatUSD(activeTenant.monthlyBudget)}</span>

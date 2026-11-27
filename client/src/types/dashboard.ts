@@ -26,6 +26,9 @@ export interface BillingTransaction {
   reference: string;
   units: string;
   notes?: string;
+  accountId?: string;
+  type?: 'credit' | 'debit';
+  currency?: string;
 }
 
 export interface ResourceMetric {

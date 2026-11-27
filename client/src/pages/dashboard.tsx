@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import { api, ApiError } from '../api/client';
 
 import { Sidebar } from '../components/common/Sidebar';
 import { Navbar } from '../components/common/Navbar';
@@ -20,11 +21,10 @@ import type {
   Tenant,
   NotificationItem,
 } from '../types/dashboard';
-import type { TransactionRecord, TransactionType } from '../api/types';
+import type { TransactionRecord, TransactionType, BalanceResponseData } from '../api/types';
 
 import {
   demoTenants,
-  demoTransactions,
   demoResourceMetrics,
   demoHistoricalUsage,
   demoServiceExpenses,
@@ -36,11 +36,17 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user: authUser, company: authCompany, logout } = useAuth();
 
-  // Navigation & Tenant state
+  // Navigation & Modal state
   const [currentTab, setCurrentTab] = useState<DashboardTab>('overview');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
-  const [currentSpend, setCurrentSpend] = useState<number>(0);
+
+  // Live API State
+  const [balanceData, setBalanceData] = useState<BalanceResponseData | null>(null);
+  const [apiTransactions, setApiTransactions] = useState<TransactionRecord[]>([]);
+  const [sessionRollbacks, setSessionRollbacks] = useState<BillingTransaction[]>([]);
+  const [isLedgerLoading, setIsLedgerLoading] = useState<boolean>(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
 
   // Active tenant derived strictly from authenticated company session
   const activeTenant: Tenant = useMemo(() => ({
@@ -53,13 +59,12 @@ export default function Dashboard() {
     activeConnections: 14,
     maxConnections: 50,
     monthlyBudget: 15000,
-    currentSpend,
+    currentSpend: balanceData ? balanceData.balance : 0,
     status: 'Healthy',
-  }), [authCompany, currentSpend]);
+  }), [authCompany, balanceData]);
 
-  // Search & Data state
+  // Search & Notifications state
   const [globalSearch, setGlobalSearch] = useState('');
-  const [transactionsMap, setTransactionsMap] = useState<Record<string, BillingTransaction[]>>(demoTransactions);
   const [notifications, setNotifications] = useState<NotificationItem[]>(demoNotifications);
 
   const user = useMemo(() => ({
@@ -69,10 +74,76 @@ export default function Dashboard() {
     company: authCompany?.name || 'Enterprise',
   }), [authUser, authCompany]);
 
-  // Active tenant data
+  // Fetch real balance and transactions from API
+  const refreshTransactionsAndBalance = useCallback(async () => {
+    setIsLedgerLoading(true);
+    setLedgerError(null);
+    try {
+      const [balRes, txRes] = await Promise.all([
+        api.getBalance('ACC001'),
+        api.listTransactions({ accountId: 'ACC001', limit: 50, page: 1 }),
+      ]);
+      setBalanceData(balRes.data);
+      setApiTransactions(txRes.data.transactions);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Failed to fetch ledger data';
+      setLedgerError(message);
+    } finally {
+      setIsLedgerLoading(false);
+    }
+  }, []);
+
+  // Fetch initial data on tenant / company load without synchronous setState in effect
+  useEffect(() => {
+    let ignore = false;
+    async function initData() {
+      try {
+        const [balRes, txRes] = await Promise.all([
+          api.getBalance('ACC001'),
+          api.listTransactions({ accountId: 'ACC001', limit: 50, page: 1 }),
+        ]);
+        if (!ignore) {
+          setBalanceData(balRes.data);
+          setApiTransactions(txRes.data.transactions);
+        }
+      } catch (err) {
+        if (!ignore) {
+          const message = err instanceof ApiError ? err.message : 'Failed to fetch ledger data';
+          setLedgerError(message);
+        }
+      } finally {
+        if (!ignore) {
+          setIsLedgerLoading(false);
+        }
+      }
+    }
+
+    initData();
+    return () => {
+      ignore = true;
+    };
+  }, [activeTenant.id]);
+
+  // Merge live transactions with session rollbacks
   const tenantTransactions = useMemo(() => {
-    return transactionsMap[activeTenant.id] || [];
-  }, [transactionsMap, activeTenant.id]);
+    const mappedApiTxs: BillingTransaction[] = apiTransactions.map((tx) => ({
+      id: tx._id,
+      eventId: tx.eventId,
+      tenantId: activeTenant.id,
+      accountId: tx.accountId,
+      type: tx.type,
+      currency: tx.currency,
+      serviceName: `${tx.type === 'credit' ? 'Account Credit' : 'Account Debit'} (${tx.currency})`,
+      category: 'API Gateway',
+      amount: tx.amount,
+      status: 'committed', // Map backend 'completed' -> 'committed'
+      timestamp: new Date(tx.createdAt).toLocaleString(),
+      reference: tx._id,
+      units: `${tx.type === 'credit' ? '+' : '-'}${tx.amount} ${tx.currency}`,
+    }));
+
+    return [...sessionRollbacks, ...mappedApiTxs];
+  }, [apiTransactions, sessionRollbacks, activeTenant.id]);
 
   const committedCount = tenantTransactions.filter((t) => t.status === 'committed').length;
   const rolledBackCount = tenantTransactions.filter((t) => t.status === 'rolled_back').length;
@@ -86,29 +157,9 @@ export default function Dashboard() {
   const currentServiceExpenses =
     demoServiceExpenses[activeTenant.id] || demoServiceExpenses['tenant-acme'];
 
-
   // Handle live transaction success from API
   const handleTransactionSuccess = (tx: TransactionRecord, newBalance: number, isReplay: boolean) => {
-    const mappedTx: BillingTransaction = {
-      id: tx._id,
-      eventId: tx.eventId,
-      tenantId: activeTenant.id,
-      serviceName: `${tx.type === 'credit' ? 'Account Credit' : 'Account Debit'} (${tx.currency})`,
-      category: 'Other Services',
-      amount: tx.amount,
-      status: 'committed',
-      timestamp: 'Just now',
-      reference: `TX-${tx.accountId}-${tx._id.slice(-6).toUpperCase()}`,
-      units: `${tx.amount} ${tx.currency}`,
-      notes: isReplay ? 'Idempotent replay: original transaction returned' : 'Single-charge ACID transaction verified',
-    };
-
-    setTransactionsMap((prev) => ({
-      ...prev,
-      [activeTenant.id]: [mappedTx, ...(prev[activeTenant.id] || [])],
-    }));
-
-    setCurrentSpend(newBalance);
+    refreshTransactionsAndBalance();
 
     const notif: NotificationItem = {
       id: `notif-${Date.now()}`,
@@ -138,20 +189,20 @@ export default function Dashboard() {
       id: `rollback-${Date.now()}`,
       eventId: rollbackInfo.eventId,
       tenantId: activeTenant.id,
-      serviceName: `Simulated Failure Abort (${rollbackInfo.type.toUpperCase()})`,
-      category: 'Other Services',
+      accountId: rollbackInfo.accountId,
+      type: rollbackInfo.type,
+      currency: rollbackInfo.currency,
+      serviceName: `${rollbackInfo.type === 'credit' ? 'Account Credit' : 'Account Debit'} (Rolled Back)`,
+      category: 'API Gateway',
       amount: rollbackInfo.amount,
       status: 'rolled_back',
-      timestamp: 'Just now',
-      reference: `ROLLBACK-${rollbackInfo.accountId}`,
+      timestamp: rollbackInfo.timestamp,
+      reference: 'ROLLED_BACK_ACID',
       units: `${rollbackInfo.amount} ${rollbackInfo.currency}`,
-      notes: 'Simulated failure aborted by backend. Zero balance deduction.',
+      notes: rollbackInfo.reason,
     };
 
-    setTransactionsMap((prev) => ({
-      ...prev,
-      [activeTenant.id]: [rollbackTx, ...(prev[activeTenant.id] || [])],
-    }));
+    setSessionRollbacks((prev) => [rollbackTx, ...prev]);
 
     const notif: NotificationItem = {
       id: `notif-${Date.now()}`,
@@ -188,11 +239,11 @@ export default function Dashboard() {
 
   const handleExportStatement = () => {
     const csvContent =
-      'EventID,Service,Amount,Status,Timestamp,Reference\n' +
+      'EventID,Account,Type,Amount,Currency,Status,CreatedTime,Reference\n' +
       tenantTransactions
         .map(
           (t) =>
-            `"${t.eventId}","${t.serviceName}","${t.amount}","${t.status}","${t.timestamp}","${t.reference}"`
+            `"${t.eventId}","${t.accountId || 'ACC001'}","${t.type || 'credit'}","${t.amount}","${t.currency || 'INR'}","${t.status}","${t.timestamp}","${t.reference}"`
         )
         .join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -253,6 +304,7 @@ export default function Dashboard() {
                 rolledBackCount={rolledBackCount}
                 pendingCount={pendingCount}
                 failedCount={failedCount}
+                realBalance={balanceData}
               />
 
               {/* Mid-Project Review Focus: Dynamic Tenant DB Isolation & Switching Benchmark */}
@@ -268,6 +320,9 @@ export default function Dashboard() {
                 searchTerm={globalSearch}
                 onSearchChange={setGlobalSearch}
                 onOpenRecordModal={() => setIsRecordModalOpen(true)}
+                isLoading={isLedgerLoading}
+                error={ledgerError}
+                onRetry={refreshTransactionsAndBalance}
               />
             </>
           )}
@@ -280,6 +335,9 @@ export default function Dashboard() {
                 searchTerm={globalSearch}
                 onSearchChange={setGlobalSearch}
                 onOpenRecordModal={() => setIsRecordModalOpen(true)}
+                isLoading={isLedgerLoading}
+                error={ledgerError}
+                onRetry={refreshTransactionsAndBalance}
               />
             </div>
           )}

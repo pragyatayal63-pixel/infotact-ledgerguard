@@ -38,6 +38,7 @@ interface UsageChartProps {
   serviceExpenses: ServiceExpense[];
 }
 
+// WEEK 3 FEATURE: This component uses static demo data. Replace with real API aggregation endpoints.
 export const UsageChart: React.FC<UsageChartProps> = ({
   activeTenant,
   historicalData,
@@ -187,7 +188,19 @@ export const UsageChart: React.FC<UsageChartProps> = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div className="space-y-4">
+      {/* Week 3 Feature Banner */}
+      <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-xl text-xs text-amber-900 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-bold">📊 Demo Data — Week 3 Feature:</span>
+          <span>Time-series metrics and cost analytics are simulated. Aggregation endpoints will be wired in Week 3.</span>
+        </div>
+        <span className="text-[10px] font-semibold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+          Planned Feature
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Historical Usage Line Chart (8 cols) */}
       <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs flex flex-col justify-between">
         {/* Header with Title and Filters */}
@@ -328,5 +341,6 @@ export const UsageChart: React.FC<UsageChartProps> = ({
         </div>
       </div>
     </div>
+  </div>
   );
 };

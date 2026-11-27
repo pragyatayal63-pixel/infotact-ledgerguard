@@ -13,6 +13,8 @@ interface DatabasePoolStatusProps {
   onSelectTenant: (tenant: Tenant) => void;
 }
 
+// WEEK 3 FEATURE: This component uses static demo data. Replace with real API aggregation endpoints.
+
 export const DatabasePoolStatus: React.FC<DatabasePoolStatusProps> = ({
   tenants,
   activeTenant,
@@ -41,6 +43,16 @@ export const DatabasePoolStatus: React.FC<DatabasePoolStatusProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Week 3 Feature Banner */}
+      <div className="p-3 bg-amber-50 border border-amber-200/90 rounded-xl text-xs text-amber-900 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="font-bold">📊 Demo Data — Week 3 Feature:</span>
+          <span>Dynamic DB pool telemetry and live connection pool gauges are simulated until DB metrics agent connects.</span>
+        </div>
+        <span className="text-[10px] font-semibold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+          Planned Feature
+        </span>
+      </div>
       {/* 5 Summary Stat Cards for Dynamic DB Pools */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Total Database Pools */}

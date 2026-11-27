@@ -11,15 +11,20 @@ import {
   ChevronRight,
   X,
   Layers,
+  ArrowDownLeft,
+  ArrowUpRight,
+  RefreshCw,
 } from 'lucide-react';
 import type { BillingTransaction } from '../../types/dashboard';
-import { formatUSD } from '../../data/mockData';
 
 interface LedgerTableProps {
   transactions: BillingTransaction[];
   searchTerm: string;
   onSearchChange: (val: string) => void;
   onOpenRecordModal: () => void;
+  isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
 export const LedgerTable: React.FC<LedgerTableProps> = ({
@@ -27,17 +32,21 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
   searchTerm,
   onSearchChange,
   onOpenRecordModal,
+  isLoading = false,
+  error = null,
+  onRetry,
 }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'committed' | 'pending' | 'failed' | 'rolled_back'>('all');
   const [selectedTx, setSelectedTx] = useState<BillingTransaction | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 8;
 
   // Filter logic
   const filtered = useMemo(() => {
     return transactions.filter((tx) => {
       const matchSearch =
         tx.eventId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (tx.accountId && tx.accountId.toLowerCase().includes(searchTerm.toLowerCase())) ||
         tx.serviceName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tx.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tx.category.toLowerCase().includes(searchTerm.toLowerCase());
@@ -56,11 +65,11 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
   }, [filtered, currentPage, itemsPerPage]);
 
   const exportCSV = () => {
-    const headers = 'EventID,Service,Category,Amount,Status,Timestamp,Reference\n';
+    const headers = 'EventID,Account,Type,Amount,Currency,Status,CreatedTime,Reference\n';
     const rows = filtered
       .map(
         (t) =>
-          `"${t.eventId}","${t.serviceName}","${t.category}","${t.amount}","${t.status}","${t.timestamp}","${t.reference}"`
+          `"${t.eventId}","${t.accountId || 'ACC001'}","${t.type || 'credit'}","${t.amount}","${t.currency || 'INR'}","${t.status}","${t.timestamp}","${t.reference}"`
       )
       .join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv' });
@@ -84,18 +93,29 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                 Idempotent Billing Ledger
               </h3>
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                {filtered.length} Records
+                {isLoading ? 'Loading...' : `${filtered.length} Records`}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Comprehensive log of transactional events with idempotency tracking and status verification
+              Live transactional ledger powered by backend MongoDB ACID transactions and Redis idempotency locks
             </p>
           </div>
 
           <div className="flex items-center gap-2">
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                disabled={isLoading}
+                title="Refresh Ledger"
+                className="p-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold shadow-xs cursor-pointer transition-colors disabled:opacity-40"
+              >
+                <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+              </button>
+            )}
             <button
               onClick={exportCSV}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs cursor-pointer transition-colors"
+              disabled={filtered.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs cursor-pointer transition-colors disabled:opacity-40"
             >
               <FileSpreadsheet size={14} className="text-emerald-600" />
               <span>Export CSV</span>
@@ -124,7 +144,7 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                 onSearchChange(e.target.value);
                 setCurrentPage(1);
               }}
-              placeholder="Search by Event ID, service name, or reference..."
+              placeholder="Search by Event ID, Account, or Reference..."
               className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all"
             />
             {searchTerm && (
@@ -167,6 +187,19 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
             </button>
             <button
               onClick={() => {
+                setStatusFilter('rolled_back');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'rolled_back'
+                  ? 'bg-white text-amber-700 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Rolled Back
+            </button>
+            <button
+              onClick={() => {
                 setStatusFilter('pending');
                 setCurrentPage(1);
               }}
@@ -191,22 +224,27 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
             >
               Failed
             </button>
-            <button
-              onClick={() => {
-                setStatusFilter('rolled_back');
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                statusFilter === 'rolled_back'
-                  ? 'bg-white text-amber-700 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Rolled Back
-            </button>
           </div>
         </div>
       </div>
+
+      {/* Error state */}
+      {error && (
+        <div className="p-4 m-5 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-xs text-rose-700">
+          <div className="flex items-center gap-2">
+            <AlertOctagon size={16} className="text-rose-600 shrink-0" />
+            <span>Failed to load transactions: <strong>{error}</strong></span>
+          </div>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="px-3 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-lg font-semibold transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Table view */}
       <div className="overflow-x-auto">
@@ -214,46 +252,96 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
           <thead>
             <tr className="bg-slate-50/75 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
               <th className="py-3 px-5">Event ID</th>
-              <th className="py-3 px-4">Service Name</th>
-              <th className="py-3 px-4">Units / Scope</th>
+              <th className="py-3 px-4">Account</th>
+              <th className="py-3 px-4">Type</th>
               <th className="py-3 px-4 text-right">Amount</th>
               <th className="py-3 px-5 text-center">Status</th>
-              <th className="py-3 px-4">Timestamp</th>
-              <th className="py-3 px-4">Transaction Reference</th>
+              <th className="py-3 px-4">Created Time</th>
               <th className="py-3 px-4 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs">
-            {currentItems.length === 0 ? (
+            {isLoading ? (
+              // 8 Loading Skeleton Rows
+              Array.from({ length: 8 }).map((_, idx) => (
+                <tr key={`skeleton-${idx}`} className="animate-pulse">
+                  <td className="py-3.5 px-5">
+                    <div className="h-4 bg-slate-200 rounded w-32" />
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="h-4 bg-slate-200 rounded w-16" />
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="h-4 bg-slate-200 rounded w-14" />
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <div className="h-4 bg-slate-200 rounded w-20 ml-auto" />
+                  </td>
+                  <td className="py-3.5 px-5 text-center">
+                    <div className="h-4 bg-slate-200 rounded w-20 mx-auto" />
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="h-4 bg-slate-200 rounded w-28" />
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <div className="h-4 bg-slate-200 rounded w-12 ml-auto" />
+                  </td>
+                </tr>
+              ))
+            ) : currentItems.length === 0 ? (
+              // Empty State
               <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400">
-                  <p className="font-semibold text-slate-600 text-sm">
-                    No transactions found
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Try adjusting your search criteria
-                  </p>
+                <td colSpan={7} className="py-14 text-center text-slate-400">
+                  <div className="max-w-xs mx-auto space-y-3">
+                    <div className="w-10 h-10 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                      <Layers size={20} />
+                    </div>
+                    <p className="font-semibold text-slate-700 text-sm">
+                      No transactions found — record your first transaction
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      Execute a credit or debit event with idempotency verification to populate the billing ledger.
+                    </p>
+                    <button
+                      onClick={onOpenRecordModal}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Plus size={14} />
+                      <span>Record Transaction</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ) : (
               currentItems.map((tx) => {
+                const isCredit = tx.type === 'credit' || !tx.type;
                 return (
                   <tr
                     key={tx.id}
                     onClick={() => setSelectedTx(tx)}
                     className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                   >
-                    <td className="py-3.5 px-5 font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    <td className="py-3.5 px-5 font-semibold text-slate-900 group-hover:text-blue-600 transition-colors font-mono text-[11px]">
                       {tx.eventId}
                     </td>
-                    <td className="py-3.5 px-4 font-medium text-slate-800">
-                      {tx.serviceName}
+                    <td className="py-3.5 px-4 font-medium text-slate-800 font-mono text-[11px]">
+                      {tx.accountId || 'ACC001'}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500 text-[11px]">
-                      {tx.units}
+                    <td className="py-3.5 px-4">
+                      {isCredit ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <ArrowDownLeft size={10} /> Credit
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <ArrowUpRight size={10} /> Debit
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-right font-bold text-slate-900">
-                      {formatUSD(tx.amount)}
+                      <span className={isCredit ? 'text-emerald-700' : 'text-slate-900'}>
+                        {isCredit ? '+' : '-'}{tx.amount.toFixed(2)} {tx.currency || 'INR'}
+                      </span>
                     </td>
                     <td className="py-3.5 px-5 text-center">
                       {tx.status === 'committed' && (
@@ -277,11 +365,8 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                         </span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500">
+                    <td className="py-3.5 px-4 text-slate-500 text-[11px]">
                       {tx.timestamp}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
-                      {tx.reference}
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <button
@@ -303,41 +388,43 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
       </div>
 
       {/* Pagination Footer */}
-      <div className="p-4 sm:px-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-slate-500">
-        <div>
-          Showing{' '}
-          <span className="font-semibold text-slate-700">
-            {filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}
-          </span>{' '}
-          to{' '}
-          <span className="font-semibold text-slate-700">
-            {Math.min(currentPage * itemsPerPage, filtered.length)}
-          </span>{' '}
-          of <span className="font-semibold text-slate-700">{filtered.length}</span> records
-        </div>
+      {!isLoading && filtered.length > 0 && (
+        <div className="p-4 sm:px-6 bg-slate-50/60 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs text-slate-500">
+          <div>
+            Showing{' '}
+            <span className="font-semibold text-slate-700">
+              {(currentPage - 1) * itemsPerPage + 1}
+            </span>{' '}
+            to{' '}
+            <span className="font-semibold text-slate-700">
+              {Math.min(currentPage * itemsPerPage, filtered.length)}
+            </span>{' '}
+            of <span className="font-semibold text-slate-700">{filtered.length}</span> records
+          </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          >
-            <ChevronLeft size={14} />
-            <span>Prev</span>
-          </button>
-          <span className="px-2 text-slate-600 font-semibold">
-            {currentPage} of {totalPages}
-          </span>
-          <button
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
-          >
-            <span>Next</span>
-            <ChevronRight size={14} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <ChevronLeft size={14} />
+              <span>Prev</span>
+            </button>
+            <span className="px-2 text-slate-600 font-semibold">
+              {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+            >
+              <span>Next</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Transaction Details Modal */}
       {selectedTx && (
@@ -358,23 +445,19 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
             <div className="space-y-2.5 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Event ID</span>
-                <span className="font-semibold text-slate-900">{selectedTx.eventId}</span>
+                <span className="font-mono font-semibold text-slate-900">{selectedTx.eventId}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Service</span>
-                <span className="font-semibold text-slate-900">{selectedTx.serviceName}</span>
+                <span className="text-slate-500">Account ID</span>
+                <span className="font-mono font-semibold text-slate-900">{selectedTx.accountId || 'ACC001'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Category</span>
-                <span className="font-semibold text-slate-900">{selectedTx.category}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Units</span>
-                <span className="font-semibold text-slate-900">{selectedTx.units}</span>
+                <span className="text-slate-500">Type</span>
+                <span className="font-semibold text-slate-900 uppercase">{selectedTx.type || 'credit'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Amount</span>
-                <span className="font-bold text-slate-900">{formatUSD(selectedTx.amount)}</span>
+                <span className="font-bold text-slate-900">{selectedTx.amount.toFixed(2)} {selectedTx.currency || 'INR'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100 items-center">
                 <span className="text-slate-500">Status</span>
@@ -402,11 +485,11 @@ export const LedgerTable: React.FC<LedgerTableProps> = ({
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Reference</span>
+                <span className="text-slate-500">Backend Record ID</span>
                 <span className="font-mono text-slate-700">{selectedTx.reference}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-slate-500">Timestamp</span>
+                <span className="text-slate-500">Created Time</span>
                 <span className="text-slate-700">{selectedTx.timestamp}</span>
               </div>
 
