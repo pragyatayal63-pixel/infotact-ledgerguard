@@ -1,18 +1,47 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { ShieldCheck, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../auth/useAuth';
+import { ApiError } from '../api/client';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login, isLoading, authNotice, clearNotice } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
-  const [email, setEmail] = useState('admin@company.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [forgotMsg, setForgotMsg] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/dashboard');
+    setErrorMessage(null);
+    clearNotice();
+
+    try {
+      await login({ email: email.trim(), password });
+      navigate('/dashboard');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        switch (err.code) {
+          case 'INVALID_CREDENTIALS':
+            setErrorMessage('Invalid email or password. Please check your credentials.');
+            break;
+          case 'COMPANY_SUSPENDED':
+            setErrorMessage('This company account has been suspended. Please contact support.');
+            break;
+          case 'NETWORK_ERROR':
+            setErrorMessage('Unable to reach the backend server at http://localhost:5000. Please ensure it is running.');
+            break;
+          default:
+            setErrorMessage(err.message || 'An error occurred while signing in.');
+        }
+      } else {
+        setErrorMessage('An unexpected error occurred. Please try again.');
+      }
+    }
   };
 
   return (
@@ -40,9 +69,23 @@ export default function Login() {
             </p>
           </div>
 
+          {authNotice && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
+              <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+              <span>{authNotice}</span>
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
+              <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           {forgotMsg && (
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700">
-              Demo Mode: Password reset link simulation triggered. Click <strong>Sign In</strong> to continue.
+              Demo Mode: Password reset link simulation triggered.
             </div>
           )}
 
@@ -56,9 +99,10 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@company.com"
+                placeholder="admin@companya.test"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-xs"
                 required
+                disabled={isLoading}
               />
             </div>
 
@@ -85,6 +129,7 @@ export default function Login() {
                   placeholder="Enter your password"
                   className="w-full px-3.5 py-2.5 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-xs"
                   required
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -113,9 +158,17 @@ export default function Login() {
             {/* Sign In Button */}
             <button
               type="submit"
-              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors cursor-pointer mt-2"
+              disabled={isLoading}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors cursor-pointer mt-2 flex items-center justify-center gap-2"
             >
-              Sign In to Dashboard
+              {isLoading ? (
+                <>
+                  <Loader2 size={15} className="animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <span>Sign In to Dashboard</span>
+              )}
             </button>
           </form>
 

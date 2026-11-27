@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/useAuth';
 
 import { Sidebar } from '../components/common/Sidebar';
 import { Navbar } from '../components/common/Navbar';
@@ -21,7 +22,6 @@ import type {
 } from '../types/dashboard';
 
 import {
-  demoUserProfile,
   demoTenants,
   demoTransactions,
   demoResourceMetrics,
@@ -33,18 +33,40 @@ import {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user: authUser, company: authCompany, logout } = useAuth();
 
   // Navigation & Tenant state
   const [currentTab, setCurrentTab] = useState<DashboardTab>('overview');
-  const [activeTenant, setActiveTenant] = useState<Tenant>(demoTenants[0]);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isRecordModalOpen, setIsRecordModalOpen] = useState(false);
+  const [currentSpend, setCurrentSpend] = useState<number>(0);
+
+  // Active tenant derived strictly from authenticated company session
+  const activeTenant: Tenant = useMemo(() => ({
+    id: authCompany?.tenantId || 'tenant-default',
+    name: authCompany?.name || 'Enterprise Tenant',
+    slug: authCompany?.tenantId || 'default',
+    tier: 'Enterprise Active',
+    databaseCluster: `cluster-${authCompany?.tenantId || 'isolated'}.db.internal`,
+    queryLatencyMs: 1.8,
+    activeConnections: 14,
+    maxConnections: 50,
+    monthlyBudget: 15000,
+    currentSpend,
+    status: 'Healthy',
+  }), [authCompany, currentSpend]);
 
   // Search & Data state
   const [globalSearch, setGlobalSearch] = useState('');
   const [transactionsMap, setTransactionsMap] = useState<Record<string, BillingTransaction[]>>(demoTransactions);
   const [notifications, setNotifications] = useState<NotificationItem[]>(demoNotifications);
-  const user = demoUserProfile;
+
+  const user = useMemo(() => ({
+    name: authUser?.name || 'Administrator',
+    email: authUser?.email || '',
+    role: authUser?.role || 'Admin',
+    company: authCompany?.name || 'Enterprise',
+  }), [authUser, authCompany]);
 
   // Active tenant data
   const tenantTransactions = useMemo(() => {
@@ -80,17 +102,11 @@ export default function Dashboard() {
 
           // If transitioning to committed from non-committed, increment spend
           if (newStatus === 'committed' && oldStatus !== 'committed') {
-            setActiveTenant((t) => ({
-              ...t,
-              currentSpend: parseFloat((t.currentSpend + tx.amount).toFixed(2)),
-            }));
+            setCurrentSpend((prev) => parseFloat((prev + tx.amount).toFixed(2)));
           }
           // If a committed transaction were reverted to rolled_back, decrement spend
           else if (oldStatus === 'committed' && (newStatus === 'rolled_back' || newStatus === 'failed')) {
-            setActiveTenant((t) => ({
-              ...t,
-              currentSpend: parseFloat(Math.max(0, t.currentSpend - tx.amount).toFixed(2)),
-            }));
+            setCurrentSpend((prev) => parseFloat(Math.max(0, prev - tx.amount).toFixed(2)));
           }
 
           return affectedTx;
@@ -142,10 +158,7 @@ export default function Dashboard() {
     }));
 
     if (newTx.status === 'committed') {
-      setActiveTenant((prev) => ({
-        ...prev,
-        currentSpend: parseFloat((prev.currentSpend + newTx.amount).toFixed(2)),
-      }));
+      setCurrentSpend((prev) => parseFloat((prev + newTx.amount).toFixed(2)));
     }
 
     // Add notification
@@ -184,6 +197,7 @@ export default function Dashboard() {
   };
 
   const handleLogout = () => {
+    logout();
     navigate('/login');
   };
 
@@ -224,9 +238,8 @@ export default function Dashboard() {
         <Navbar
           currentTab={currentTab}
           user={user}
-          tenants={demoTenants}
+          company={authCompany}
           activeTenant={activeTenant}
-          onSelectTenant={setActiveTenant}
           notifications={notifications}
           onMarkNotificationsAsRead={handleMarkNotificationsAsRead}
           onLogout={handleLogout}
@@ -261,7 +274,7 @@ export default function Dashboard() {
               <DatabasePoolStatus
                 tenants={demoTenants}
                 activeTenant={activeTenant}
-                onSelectTenant={setActiveTenant}
+                onSelectTenant={() => {}}
               />
 
               {/* Idempotent Billing Ledger Table */}
@@ -306,7 +319,7 @@ export default function Dashboard() {
             <DatabasePoolStatus
               tenants={demoTenants}
               activeTenant={activeTenant}
-              onSelectTenant={setActiveTenant}
+              onSelectTenant={() => {}}
             />
           )}
 
