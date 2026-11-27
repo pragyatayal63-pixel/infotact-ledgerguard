@@ -58,21 +58,67 @@ Enterprise SaaS platforms require strict data isolation and fail-proof billing l
 
 ---
 
+## 📦 Monorepo Structure
+
+LedgerGuard is organized as an enterprise monorepo containing:
+- `backend/`: Node.js, Express, MongoDB (Mongoose connection pool), Redis, and JWT authentication service. Listens on `http://localhost:5000`.
+- `client/`: React 19, TypeScript, Vite, Tailwind CSS, and Chart.js enterprise dashboard. Listens on `http://localhost:5173`.
+
+---
+
+## ⚙️ Prerequisites & Environment Setup
+
+- **Node.js**: v18.0.0+ (v20+ recommended)
+- **MongoDB**: Replica set enabled (local or MongoDB Atlas) for multi-document ACID transactions
+- **Redis**: v6.0+ for distributed mutex locking and idempotency tracking
+
+### Environment Variables (Names Only)
+
+Never commit `.env` files. Reference templates: `backend/.env.example` and `client/.env.example`.
+- **Backend (`backend/.env`)**:
+  - `PORT`: Server port (default 5000)
+  - `MONGO_URI`: MongoDB connection string (replica set URI required for transactions)
+  - `REDIS_URL`: Redis connection URL
+  - `JWT_SECRET`: Signing secret for authentication tokens
+- **Client (`client/.env`)**:
+  - `VITE_API_URL`: Backend API base URL (`http://localhost:5000/api`)
+
+---
+
 ## 🚀 Running the Project
 
+### 1. Start the Backend (Port 5000)
 ```bash
-# Navigate to the client directory
-cd client
-
-# Install dependencies (including Chart.js and React ChartJS 2)
+cd backend
 npm install
-
-# Start Vite development server
 npm run dev
-
-# Run TypeScript compilation and production build
-npm run build
 ```
+Verify health: `GET http://localhost:5000/api/health`
+
+### 2. Start the Frontend Client (Port 5173)
+```bash
+cd client
+npm install
+npm run dev
+```
+Access dashboard: `http://localhost:5173`
+
+---
+
+## 🛡️ Core Architectural Invariants
+
+### Dynamic Tenant Isolation
+Tenant isolation is enforced strictly at the database connection layer via Mongoose connection pooling. The API Gateway extracts and verifies the tenant context exclusively from the cryptographically signed JWT bearer token. The client never supplies an `x-tenant-id` header or body tenant identifier. All database read/write queries route dynamically to dedicated, isolated tenant databases (`tenant_<tenantId>`), ensuring absolute multi-tenant segregation.
+
+### Idempotency & Distributed Locking
+To prevent duplicate billing and race conditions, every transaction requires a client-generated UUID `eventId`. Upon receipt, the backend acquires a distributed Redis lock (`resource_lock:<tenantId>:<accountId>`) using atomic `SET NX PX` operations. The transaction executes inside a MongoDB multi-document ACID session. If an event is retransmitted, the backend detects the existing record and safely returns an idempotent replay (`200 OK`) without duplicate deductions.
+
+### Testing Rules
+All automated and live integration tests against the backend must adhere to strict safety boundaries:
+- Use dedicated test tenants (`companya`, `companyb`) and test users (`admin@companya.test`, `admin@companyb.test`).
+- Test accounts use `ACC001`.
+- All integration and QA event IDs must use the prefix `qa-int-`.
+- Never delete or corrupt existing production/audit ledger records.
 
 ---
 
